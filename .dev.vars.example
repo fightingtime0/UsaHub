@@ -1,0 +1,5 @@
+# Local Cloudflare Workers emulation (wrangler dev / opennextjs-cloudflare preview).
+# Copy to .dev.vars (gitignored) and fill in real values — same values as your .env.
+DATABASE_URL="postgresql://<user>:<password>@<host>/<database>?sslmode=require&channel_binding=require"
+NEXTAUTH_SECRET="<random-32-byte-secret>"
+NEXTAUTH_URL="http://localhost:8788"

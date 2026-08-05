@@ -11,7 +11,7 @@ async function getPertashopData() {
 
   const now = new Date()
 
-  const [products, todaySales, monthSales, monthPurchases, monthLoss, recentRecons] = await Promise.all([
+  const [products, todaySales, monthSales, monthPurchases, monthLossIn, monthLossOut, recentRecons] = await Promise.all([
     prisma.fuelProduct.findMany({ where: { unitId: unit.id, isActive: true }, orderBy: { name: 'asc' } }),
     prisma.fuelSale.aggregate({
       where: { unitId: unit.id, soldAt: { gte: startOfDay(now), lte: endOfDay(now) } },
@@ -28,8 +28,13 @@ async function getPertashopData() {
       _sum: { total: true, liters: true },
       _count: true,
     }),
-    prisma.fuelStockReading.aggregate({
-      where: { unitId: unit.id, date: { gte: startOfMonth(now), lte: endOfMonth(now) } },
+    // Loss/susut kini tercatat per transaksi (masuk & keluar), bukan lagi pengukuran 2x/hari
+    prisma.fuelPurchase.aggregate({
+      where: { unitId: unit.id, purchasedAt: { gte: startOfMonth(now), lte: endOfMonth(now) } },
+      _sum: { lossLiters: true },
+    }),
+    prisma.fuelSale.aggregate({
+      where: { unitId: unit.id, soldAt: { gte: startOfMonth(now), lte: endOfMonth(now) } },
       _sum: { lossLiters: true },
     }),
     prisma.fuelReconciliation.findMany({
@@ -38,6 +43,8 @@ async function getPertashopData() {
       take: 5,
     }),
   ])
+
+  const monthLoss = Number(monthLossIn._sum.lossLiters ?? 0) + Number(monthLossOut._sum.lossLiters ?? 0)
 
   return { unit, products, todaySales, monthSales, monthPurchases, monthLoss, recentRecons }
 }
@@ -51,7 +58,7 @@ export default async function PertashopPage() {
 
   const { unit, products, todaySales, monthSales, monthPurchases, monthLoss, recentRecons } = data
 
-  const lossMonth = Number(monthLoss._sum.lossLiters ?? 0)
+  const lossMonth = monthLoss
 
   return (
     <div className="space-y-5">
@@ -189,9 +196,7 @@ export default async function PertashopPage() {
           {/* Quick nav */}
           <div className="grid grid-cols-2 gap-2.5">
             {[
-              { label: 'Belanja', href: '/pertashop/belanja', icon: 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z' },
-              { label: 'Penjualan', href: '/pertashop/penjualan', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
-              { label: 'Stok & Loss', href: '/pertashop/stok', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
+              { label: 'Input Transaksi', href: '/pertashop/transaksi', icon: 'M12 4v16m8-8H4' },
               { label: 'Rekonsiliasi', href: '/pertashop/rekonsiliasi', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
             ].map((nav) => (
               <Link

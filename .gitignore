@@ -2,3 +2,7 @@
 node_modules/
 .next/
 .env
+.dev.vars
+.open-next/
+.wrangler/
+tsconfig.tsbuildinfo

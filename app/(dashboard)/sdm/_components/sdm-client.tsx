@@ -6,11 +6,13 @@ import { formatRupiah, formatDate } from '@/lib/utils'
 type Unit = { id: string; name: string; type: string }
 type Employee = {
   id: string; name: string; position: string | null; phone: string | null
-  email: string | null; idNumber: string | null; salary: number | null
+  email: string | null; idNumber: string | null; address: string | null; salary: number | null
   joinDate: string | null; isActive: boolean
   primaryUnit: { name: string; type: string }
   user: { email: string; role: string } | null
 }
+
+const ROLES = ['STAFF', 'CASHIER', 'MANAGER'] as const
 
 const UNIT_COLOR: Record<string, string> = {
   RETAIL:     'bg-sky-100 text-sky-700',
@@ -41,10 +43,14 @@ export function SdmClient({
     name: '', primaryUnitId: '', position: '', phone: '', email: '',
     idNumber: '', address: '', salary: '', joinDate: '',
   })
+  const [createAccount, setCreateAccount] = useState(false)
+  const [accountForm, setAccountForm] = useState({ password: '', role: 'STAFF' as string })
 
   function openAdd() {
     setEditEmployee(null)
     setForm({ name: '', primaryUnitId: units[0]?.id ?? '', position: '', phone: '', email: '', idNumber: '', address: '', salary: '', joinDate: '' })
+    setCreateAccount(false)
+    setAccountForm({ password: '', role: 'STAFF' })
     setError('')
     setShowModal(true)
   }
@@ -59,10 +65,12 @@ export function SdmClient({
       phone:        emp.phone ?? '',
       email:        emp.email ?? '',
       idNumber:     emp.idNumber ?? '',
-      address:      '',
+      address:      emp.address ?? '',
       salary:       emp.salary ? String(emp.salary) : '',
       joinDate:     emp.joinDate ? emp.joinDate.split('T')[0] : '',
     })
+    setCreateAccount(false)
+    setAccountForm({ password: '', role: 'STAFF' })
     setError('')
     setShowModal(true)
   }
@@ -71,13 +79,24 @@ export function SdmClient({
     e.preventDefault()
     setLoading(true); setError('')
 
+    if (!editEmployee && createAccount) {
+      if (!form.email) { setLoading(false); return setError('Email wajib diisi untuk membuat akun login') }
+      if (accountForm.password.length < 8) { setLoading(false); return setError('Password akun minimal 8 karakter') }
+    }
+
     const url    = editEmployee ? `/api/sdm/karyawan/${editEmployee.id}` : '/api/sdm/karyawan'
     const method = editEmployee ? 'PUT' : 'POST'
 
     const res = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, salary: form.salary ? Number(form.salary) : undefined }),
+      body: JSON.stringify({
+        ...form,
+        salary: form.salary ? Number(form.salary) : undefined,
+        ...(!editEmployee && createAccount
+          ? { account: { password: accountForm.password, role: accountForm.role } }
+          : {}),
+      }),
     })
     const data = await res.json()
     setLoading(false)
@@ -219,7 +238,45 @@ export function SdmClient({
                       className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
                   </div>
                 ))}
+                <div className="col-span-2">
+                  <label className="block text-xs text-gray-500 mb-1">Alamat</label>
+                  <textarea value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} rows={2}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                </div>
               </div>
+
+              {!editEmployee && (
+                <div className="border border-gray-200 rounded-lg p-3">
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <input type="checkbox" checked={createAccount}
+                      onChange={(e) => setCreateAccount(e.target.checked)} />
+                    Buatkan akun login untuk karyawan ini
+                  </label>
+                  {createAccount && (
+                    <div className="grid grid-cols-2 gap-4 mt-3">
+                      <div className="col-span-2">
+                        <p className="text-xs text-gray-400 mb-2">Login akan menggunakan email di atas — pastikan email sudah diisi.</p>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Password Awal *</label>
+                        <input type="text" value={accountForm.password}
+                          onChange={(e) => setAccountForm({ ...accountForm, password: e.target.value })}
+                          placeholder="min. 8 karakter"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Role</label>
+                        <select value={accountForm.role}
+                          onChange={(e) => setAccountForm({ ...accountForm, role: e.target.value })}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                          {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {error && <p className="text-sm text-red-600">{error}</p>}
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowModal(false)}

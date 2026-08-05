@@ -4,7 +4,8 @@
 // ============================================================
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -667,12 +668,18 @@ model FuelProduct {
 }
 
 // Belanja BBM (liter & harga beli) → stok bertambah
+// shift/expectedStock/actualStock/lossLiters: null pada entri lama (sebelum form transaksi
+// terpadu) — entri baru selalu mengisi actualStock (hasil ukur tangki) untuk memantau penguapan.
 model FuelPurchase {
   id             String   @id @default(cuid())
   purchaseNumber String   @unique
   liters         Decimal  @db.Decimal(12, 3)
   buyPrice       Decimal  @db.Decimal(12, 2) // per liter
   total          Decimal  @db.Decimal(14, 2) // liters * buyPrice
+  shift          String?
+  expectedStock  Decimal? @db.Decimal(12, 3) // stok sistem sebelum dikoreksi ke hasil ukur
+  actualStock    Decimal? @db.Decimal(12, 3) // hasil ukur tangki operator setelah transaksi ini
+  lossLiters     Decimal? @db.Decimal(12, 3) // expectedStock − actualStock
   note           String?
   purchasedAt    DateTime @default(now())
   createdAt      DateTime @default(now())
@@ -690,16 +697,20 @@ model FuelPurchase {
 // Penjualan BBM (liter & harga jual) → stok berkurang
 // buyPrice di-snapshot agar margin historis tidak berubah saat harga beli naik
 model FuelSale {
-  id         String   @id @default(cuid())
-  saleNumber String   @unique
-  liters     Decimal  @db.Decimal(12, 3)
-  sellPrice  Decimal  @db.Decimal(12, 2) // per liter
-  buyPrice   Decimal  @db.Decimal(12, 2) // snapshot harga beli saat jual
-  total      Decimal  @db.Decimal(14, 2) // liters * sellPrice
-  margin     Decimal  @db.Decimal(14, 2) // liters * (sellPrice - buyPrice)
-  note       String?
-  soldAt     DateTime @default(now())
-  createdAt  DateTime @default(now())
+  id            String   @id @default(cuid())
+  saleNumber    String   @unique
+  liters        Decimal  @db.Decimal(12, 3)
+  sellPrice     Decimal  @db.Decimal(12, 2) // per liter
+  buyPrice      Decimal  @db.Decimal(12, 2) // snapshot harga beli saat jual
+  total         Decimal  @db.Decimal(14, 2) // liters * sellPrice
+  margin        Decimal  @db.Decimal(14, 2) // liters * (sellPrice - buyPrice)
+  shift         String?
+  expectedStock Decimal? @db.Decimal(12, 3) // stok sistem sebelum dikoreksi ke hasil ukur
+  actualStock   Decimal? @db.Decimal(12, 3) // hasil ukur tangki operator setelah transaksi ini
+  lossLiters    Decimal? @db.Decimal(12, 3) // expectedStock − actualStock
+  note          String?
+  soldAt        DateTime @default(now())
+  createdAt     DateTime @default(now())
 
   fuelProductId String
   fuelProduct   FuelProduct @relation(fields: [fuelProductId], references: [id])

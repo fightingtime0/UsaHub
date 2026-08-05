@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth'
+import { getSession, hasUnitAccess } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generateInvoiceNumber } from '@/lib/utils'
 
@@ -7,6 +7,7 @@ import { generateInvoiceNumber } from '@/lib/utils'
 export async function GET() {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasUnitAccess(session, 'PERTASHOP')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const unit = await prisma.businessUnit.findFirst({ where: { type: 'PERTASHOP', isActive: true } })
   if (!unit) return NextResponse.json({ error: 'Unit Pertashop tidak ditemukan' }, { status: 404 })
@@ -21,13 +22,16 @@ export async function GET() {
   return NextResponse.json(purchases)
 }
 
-// POST — catat belanja BBM (liter & harga beli) → stok bertambah, harga beli produk ter-update
+// POST — catat transaksi MASUK (belanja/pengisian stok BBM).
+// actualStock (hasil ukur tangki setelah pengisian) wajib diisi — dipakai untuk memantau
+// penguapan/susut secara berkelanjutan, dan menjadi acuan koreksi stok sistem.
 export async function POST(req: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasUnitAccess(session, 'PERTASHOP')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
-  const { fuelProductId, liters, buyPrice, note, purchasedAt } = body
+  const { fuelProductId, liters, buyPrice, actualStock, shift, note, purchasedAt } = body
 
   if (!fuelProductId || !liters || !buyPrice) {
     return NextResponse.json({ error: 'Produk, liter, dan harga beli wajib diisi' }, { status: 400 })
@@ -35,21 +39,35 @@ export async function POST(req: NextRequest) {
   if (Number(liters) <= 0 || Number(buyPrice) <= 0) {
     return NextResponse.json({ error: 'Liter dan harga beli harus lebih dari 0' }, { status: 400 })
   }
+  if (actualStock === undefined || actualStock === null || actualStock === '') {
+    return NextResponse.json({ error: 'Stok sekarang (hasil ukur tangki) wajib diisi' }, { status: 400 })
+  }
+  if (Number(actualStock) < 0) {
+    return NextResponse.json({ error: 'Stok sekarang tidak boleh negatif' }, { status: 400 })
+  }
 
   const product = await prisma.fuelProduct.findUnique({ where: { id: fuelProductId } })
   if (!product || !product.isActive) {
     return NextResponse.json({ error: 'Produk BBM tidak ditemukan' }, { status: 404 })
   }
 
-  const total = Number(liters) * Number(buyPrice)
+  const litersNum = Number(liters)
+  const total = litersNum * Number(buyPrice)
+  const expectedStock = Number(product.stock) + litersNum
+  const actual = Number(actualStock)
+  const lossLiters = expectedStock - actual
 
   const [purchase] = await prisma.$transaction([
     prisma.fuelPurchase.create({
       data: {
         purchaseNumber: generateInvoiceNumber('FBL'),
-        liters: Number(liters),
+        liters: litersNum,
         buyPrice: Number(buyPrice),
         total,
+        shift: shift || null,
+        expectedStock,
+        actualStock: actual,
+        lossLiters,
         note: note ?? null,
         purchasedAt: purchasedAt ? new Date(purchasedAt) : new Date(),
         fuelProductId,
@@ -59,7 +77,7 @@ export async function POST(req: NextRequest) {
     prisma.fuelProduct.update({
       where: { id: fuelProductId },
       data: {
-        stock: { increment: Number(liters) },
+        stock: actual, // koreksi ke hasil ukur, bukan sekadar increment
         buyPrice: Number(buyPrice), // harga beli terbaru jadi acuan margin berikutnya
       },
     }),

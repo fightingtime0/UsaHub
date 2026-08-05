@@ -70,3 +70,11 @@ export const requireAuth = async () => {
   if (!session) throw new Error('Unauthorized')
   return session
 }
+
+// Mirrors middleware.ts's unit route guard, for use inside API routes
+// (middleware.ts only matches page routes, not /api/*).
+export const hasUnitAccess = (session: Awaited<ReturnType<typeof getSession>>, unitType: string) => {
+  if (!session) return false
+  if (session.user.role === 'OWNER') return true
+  return session.user.primaryUnitType === unitType
+}
