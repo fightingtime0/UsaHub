@@ -79,7 +79,7 @@ export function SdmClient({
     e.preventDefault()
     setLoading(true); setError('')
 
-    if (!editEmployee && createAccount) {
+    if (createAccount) {
       if (!form.email) { setLoading(false); return setError('Email wajib diisi untuk membuat akun login') }
       if (accountForm.password.length < 8) { setLoading(false); return setError('Password akun minimal 8 karakter') }
     }
@@ -93,7 +93,7 @@ export function SdmClient({
       body: JSON.stringify({
         ...form,
         salary: form.salary ? Number(form.salary) : undefined,
-        ...(!editEmployee && createAccount
+        ...(createAccount
           ? { account: { password: accountForm.password, role: accountForm.role } }
           : {}),
       }),
@@ -226,7 +226,7 @@ export function SdmClient({
                 {[
                   { label: 'Jabatan', key: 'position', type: 'text' },
                   { label: 'No. HP', key: 'phone', type: 'text' },
-                  { label: 'Email', key: 'email', type: 'email' },
+                  { label: 'Email (kontak — bukan akun login)', key: 'email', type: 'email' },
                   { label: 'No. KTP', key: 'idNumber', type: 'text' },
                   { label: 'Gaji (Rp)', key: 'salary', type: 'number' },
                   { label: 'Tanggal Bergabung', key: 'joinDate', type: 'date' },
@@ -245,17 +245,25 @@ export function SdmClient({
                 </div>
               </div>
 
-              {!editEmployee && (
+              {editEmployee && editEmployee.user && (
+                <div className="border border-emerald-200 bg-emerald-50 rounded-lg p-3 text-sm text-emerald-800">
+                  Sudah punya akun login: <span className="font-semibold">{editEmployee.user.email}</span> · {editEmployee.user.role}
+                </div>
+              )}
+
+              {(!editEmployee || !editEmployee.user) && (
                 <div className="border border-gray-200 rounded-lg p-3">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
                     <input type="checkbox" checked={createAccount}
                       onChange={(e) => setCreateAccount(e.target.checked)} />
-                    Buatkan akun login untuk karyawan ini
+                    {editEmployee
+                      ? 'Karyawan ini belum punya akun login — buatkan sekarang'
+                      : 'Buatkan akun login untuk karyawan ini'}
                   </label>
                   {createAccount && (
                     <div className="grid grid-cols-2 gap-4 mt-3">
                       <div className="col-span-2">
-                        <p className="text-xs text-gray-400 mb-2">Login akan menggunakan email di atas — pastikan email sudah diisi.</p>
+                        <p className="text-xs text-gray-400 mb-2">Login akan menggunakan email di kolom Email di atas — pastikan email sudah diisi.</p>
                       </div>
                       <div>
                         <label className="block text-xs text-gray-500 mb-1">Password Awal *</label>

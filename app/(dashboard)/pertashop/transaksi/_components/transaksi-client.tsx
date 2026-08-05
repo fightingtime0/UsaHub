@@ -20,9 +20,12 @@ type LogEntry = {
   at: string
 }
 
+const RESET_CONFIRM_PHRASE = 'RESET PERTASHOP'
+
 export function TransaksiClient({ products, log, role }: { products: ProductLite[]; log: LogEntry[]; role: string }) {
   const router = useRouter()
   const canManageProduct = ['OWNER', 'MANAGER'].includes(role)
+  const isOwner = role === 'OWNER'
 
   // ── Form transaksi (masuk/keluar) ──────────────────────────
   const [loading, setLoading] = useState(false)
@@ -169,6 +172,29 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
       router.refresh()
     } finally {
       setLoading(false)
+    }
+  }
+
+  // ── Reset data (danger zone, OWNER only) ───────────────────
+  const [resetConfirmText, setResetConfirmText] = useState('')
+  const [resetLoading, setResetLoading] = useState(false)
+  const [resetError, setResetError] = useState('')
+
+  async function handleReset() {
+    if (resetConfirmText !== RESET_CONFIRM_PHRASE) return
+    setResetError('')
+    setResetLoading(true)
+    try {
+      const res = await fetch('/api/pertashop/reset', { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) {
+        setResetError(data.error ?? 'Gagal mereset data')
+        return
+      }
+      setResetConfirmText('')
+      router.refresh()
+    } finally {
+      setResetLoading(false)
     }
   }
 
@@ -457,6 +483,32 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
           </div>
         </div>
       </div>
+
+      {isOwner && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 md:p-5">
+          <h2 className="font-semibold text-red-800 text-sm md:text-base mb-1">Zona Berbahaya — Reset Data Pertashop</h2>
+          <p className="text-xs md:text-sm text-red-700 mb-3">
+            Menghapus <strong>seluruh riwayat transaksi masuk & keluar</strong> dan mengembalikan{' '}
+            <strong>stok semua produk BBM ke 0</strong>. Tindakan ini <strong>tidak bisa dibatalkan</strong>.
+            Rekonsiliasi setoran tidak terhapus.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+            <input
+              type="text" value={resetConfirmText} onChange={(e) => setResetConfirmText(e.target.value)}
+              placeholder={`Ketik "${RESET_CONFIRM_PHRASE}" untuk konfirmasi`}
+              className="flex-1 border border-red-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+            />
+            <button
+              onClick={handleReset}
+              disabled={resetConfirmText !== RESET_CONFIRM_PHRASE || resetLoading}
+              className="bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors flex-shrink-0"
+            >
+              {resetLoading ? 'Mereset...' : 'Reset Sekarang'}
+            </button>
+          </div>
+          {resetError && <p className="text-xs text-red-700 mt-2">{resetError}</p>}
+        </div>
+      )}
     </div>
   )
 }
