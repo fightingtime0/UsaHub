@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-type Unit = { id: string; name: string; type: string }
+type Unit = { id: string; name: string; type: string; location: string | null }
 
 const UNIT_TYPE_LABEL: Record<string, string> = {
   RETAIL: 'Toko',
@@ -72,20 +72,23 @@ function SiteNameCard({ initialSiteName }: { initialSiteName: string }) {
 function UnitRow({ unit }: { unit: Unit }) {
   const router = useRouter()
   const [name, setName] = useState(unit.name)
+  const [location, setLocation] = useState(unit.location ?? '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const dirty = name.trim() !== unit.name && name.trim().length > 0
+  const dirty =
+    (name.trim() !== unit.name && name.trim().length > 0) ||
+    location.trim() !== (unit.location ?? '')
 
   async function handleSave() {
-    if (!dirty) return
+    if (!dirty || !name.trim()) return
     setError('')
     setLoading(true)
     try {
       const res = await fetch(`/api/settings/units/${unit.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() }),
+        body: JSON.stringify({ name: name.trim(), location: location.trim() }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -99,13 +102,14 @@ function UnitRow({ unit }: { unit: Unit }) {
   }
 
   return (
-    <div className="px-4 md:px-5 py-3">
+    <div className="px-4 md:px-5 py-3 space-y-2">
       <div className="flex items-center gap-2">
         <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-600 flex-shrink-0">
           {UNIT_TYPE_LABEL[unit.type] ?? unit.type}
         </span>
         <input
           value={name} onChange={(e) => setName(e.target.value)}
+          placeholder="Nama"
           className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
         />
         <button
@@ -115,7 +119,12 @@ function UnitRow({ unit }: { unit: Unit }) {
           {loading ? 'Menyimpan...' : 'Simpan'}
         </button>
       </div>
-      {error && <p className="text-xs text-red-600 mt-1.5">{error}</p>}
+      <input
+        value={location} onChange={(e) => setLocation(e.target.value)}
+        placeholder="Alamat / lokasi (mis. Jl. Raya Jetis KM 3)"
+        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+      />
+      {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   )
 }
