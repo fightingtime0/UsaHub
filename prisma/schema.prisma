@@ -120,6 +120,18 @@ enum GroupOrderStatus {
 }
 
 // ============================================================
+// APP SETTINGS — satu baris (singleton), nama aplikasi/branding
+// ============================================================
+
+model AppSettings {
+  id        String   @id @default("singleton")
+  siteName  String   @default("Bisnis Terpadu")
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
+// ============================================================
 // AUTH & USER
 // ============================================================
 

@@ -14,9 +14,11 @@ type User = {
 
 export function DashboardShell({
   user,
+  siteName,
   children,
 }: {
   user: User
+  siteName: string
   children: React.ReactNode
 }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false)
@@ -53,6 +55,7 @@ export function DashboardShell({
       {/* Sidebar — dikontrol dari sini */}
       <Sidebar
         user={user}
+        siteName={siteName}
         isMobileOpen={isMobileOpen}
         onClose={() => setIsMobileOpen(false)}
       />
@@ -74,7 +77,7 @@ export function DashboardShell({
 
           {/* Brand name singkat */}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-gray-900 truncate">ADSjetis</p>
+            <p className="text-sm font-bold text-gray-900 truncate">{siteName}</p>
           </div>
 
           {/* Avatar mini — klik tidak perlu action, hanya visual */}

@@ -1,12 +1,16 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import { getSiteName } from '@/lib/settings'
 
 const inter = Inter({ subsets: ['latin'] })
 
-export const metadata: Metadata = {
-  title: 'Bisnis Terpadu',
-  description: 'Sistem Manajemen Bisnis Terpadu',
+export async function generateMetadata(): Promise<Metadata> {
+  const siteName = await getSiteName()
+  return {
+    title: siteName,
+    description: 'Sistem Manajemen Bisnis Terpadu',
+  }
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
