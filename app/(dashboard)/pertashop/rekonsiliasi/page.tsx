@@ -7,6 +7,7 @@ import { RekonsiliasiClient } from './_components/rekonsiliasi-client'
 export default async function RekonsiliasiPage() {
   const session = await getSession()
   if (!session) redirect('/login')
+  if (!['OWNER', 'MANAGER'].includes(session.user.role)) redirect('/pertashop')
 
   const unit = await getTenantUnit(session.user.tenantId!, 'PERTASHOP')
   if (!unit) return <p className="text-red-500">Unit Pertashop tidak ditemukan.</p>

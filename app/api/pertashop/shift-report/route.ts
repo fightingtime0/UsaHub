@@ -56,11 +56,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Stok sekarang tidak boleh negatif' }, { status: 400 })
   }
 
+  // Operator (STAFF) tidak boleh menentukan/tahu harga beli — margin rahasia. Harga beli
+  // selalu diambil dari sistem untuk peran ini, jadi validasi & input harga dari client dilewati.
+  const isStaffBuyer = session.user.role === 'STAFF' && direction === 'IN'
+
   if (direction !== 'STOK') {
     if (!liters || Number(liters) <= 0) {
       return NextResponse.json({ error: 'Jumlah liter harus lebih dari 0' }, { status: 400 })
     }
-    if (direction === 'IN' && (!price || Number(price) <= 0)) {
+    if (direction === 'IN' && !isStaffBuyer && (!price || Number(price) <= 0)) {
       return NextResponse.json({ error: 'Harga beli harus lebih dari 0' }, { status: 400 })
     }
   } else if (!['OPENING', 'CLOSING'].includes(readingType)) {
@@ -97,7 +101,7 @@ export async function POST(req: NextRequest) {
 
       if (direction === 'IN') {
         const litersNum = Number(liters)
-        const buyPrice = Number(price)
+        const buyPrice = isStaffBuyer ? Number(product.buyPrice) : Number(price)
         const total = litersNum * buyPrice
         const expectedStock = Number(product.stock) + litersNum
         const lossLiters = expectedStock - actual

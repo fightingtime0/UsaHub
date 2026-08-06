@@ -1,7 +1,14 @@
+import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
+import { getTransaksiPageData } from '../_lib/get-transaksi-data'
+import { TransaksiClient } from '../transaksi/_components/transaksi-client'
 
-// Pencatatan stok kini terpadu di tiap transaksi (lihat halaman transaksi).
-// Riwayat pengukuran OPENING/CLOSING lama tetap tersimpan di database.
-export default function StokPage() {
-  redirect('/pertashop/transaksi')
+export default async function StokAwalPage() {
+  const session = await getSession()
+  if (!session) redirect('/login')
+
+  const data = await getTransaksiPageData(session)
+  if (!data) return <p className="text-red-500">Unit Pertashop tidak ditemukan.</p>
+
+  return <TransaksiClient {...data} lockedDirection="STOK" lockedReadingType="OPENING" />
 }

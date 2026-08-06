@@ -22,13 +22,13 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ month: monthParam, amount: entry ? Number(entry.amount) : 0, note: entry?.note ?? null })
 }
 
-// POST — simpan/perbarui Biaya Gaji untuk satu bulan (upsert). Hanya OWNER/MANAGER (data payroll sensitif).
+// POST — simpan/perbarui Biaya Gaji untuk satu bulan (upsert). Hanya OWNER (data payroll sensitif).
 export async function POST(req: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasUnitAccess(session, 'PERTASHOP')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  if (!['OWNER', 'MANAGER'].includes(session.user.role)) {
-    return NextResponse.json({ error: 'Hanya Owner/Manager yang bisa mengisi Biaya Gaji' }, { status: 403 })
+  if (session.user.role !== 'OWNER') {
+    return NextResponse.json({ error: 'Hanya Owner yang bisa mengisi Biaya Gaji' }, { status: 403 })
   }
 
   const body = await req.json()

@@ -60,6 +60,8 @@ export default async function PertashopPage() {
   const { unit, products, todaySales, monthSales, monthPurchases, monthLoss, recentRecons } = data
 
   const lossMonth = monthLoss
+  // Operator (STAFF) tidak boleh tahu margin/profit — turunan dari harga beli yang dirahasiakan.
+  const isStaff = session.user.role === 'STAFF'
 
   return (
     <div className="space-y-5">
@@ -82,12 +84,12 @@ export default async function PertashopPage() {
             sub: `${Number(todaySales._sum.liters ?? 0).toLocaleString('id-ID')} liter`,
             color: 'bg-emerald-500',
           },
-          {
+          ...(isStaff ? [] : [{
             label: 'Margin Bulan Ini',
             value: formatRupiah(Number(monthSales._sum.margin ?? 0)),
             sub: `dari ${formatRupiah(Number(monthSales._sum.total ?? 0))} sales`,
             color: 'bg-teal-500',
-          },
+          }]),
           {
             label: 'Belanja Bulan Ini',
             value: formatRupiah(Number(monthPurchases._sum.total ?? 0)),
@@ -116,7 +118,7 @@ export default async function PertashopPage() {
         {/* Stok & margin per produk */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm">
           <div className="px-4 md:px-5 py-3 md:py-4 border-b border-gray-100">
-            <h2 className="font-semibold text-gray-900 text-sm md:text-base">Stok & Margin BBM</h2>
+            <h2 className="font-semibold text-gray-900 text-sm md:text-base">{isStaff ? 'Stok BBM' : 'Stok & Margin BBM'}</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -124,15 +126,15 @@ export default async function PertashopPage() {
                 <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
                   <th className="px-4 md:px-5 py-2.5 font-medium">Produk</th>
                   <th className="px-3 py-2.5 font-medium text-right">Stok (L)</th>
-                  <th className="px-3 py-2.5 font-medium text-right">Harga Beli/L</th>
+                  {!isStaff && <th className="px-3 py-2.5 font-medium text-right">Harga Beli/L</th>}
                   <th className="px-3 py-2.5 font-medium text-right">Harga Jual/L</th>
-                  <th className="px-4 md:px-5 py-2.5 font-medium text-right">Margin/L</th>
+                  {!isStaff && <th className="px-4 md:px-5 py-2.5 font-medium text-right">Margin/L</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {products.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-5 py-6 text-center text-gray-400">
+                    <td colSpan={isStaff ? 3 : 5} className="px-5 py-6 text-center text-gray-400">
                       Belum ada produk BBM. Tambahkan lewat halaman Belanja.
                     </td>
                   </tr>
@@ -145,11 +147,13 @@ export default async function PertashopPage() {
                       <td className="px-3 py-3 text-right font-semibold text-gray-800">
                         {Number(p.stock).toLocaleString('id-ID', { maximumFractionDigits: 2 })}
                       </td>
-                      <td className="px-3 py-3 text-right text-gray-600">{formatRupiah(Number(p.buyPrice))}</td>
+                      {!isStaff && <td className="px-3 py-3 text-right text-gray-600">{formatRupiah(Number(p.buyPrice))}</td>}
                       <td className="px-3 py-3 text-right text-gray-600">{formatRupiah(Number(p.sellPrice))}</td>
-                      <td className={`px-4 md:px-5 py-3 text-right font-semibold ${marginPerL >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {formatRupiah(marginPerL)}
-                      </td>
+                      {!isStaff && (
+                        <td className={`px-4 md:px-5 py-3 text-right font-semibold ${marginPerL >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {formatRupiah(marginPerL)}
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
@@ -197,9 +201,11 @@ export default async function PertashopPage() {
           {/* Quick nav */}
           <div className="grid grid-cols-2 gap-2.5">
             {[
-              { label: 'Input Transaksi', href: '/pertashop/transaksi', icon: 'M12 4v16m8-8H4' },
-              { label: 'Rekonsiliasi', href: '/pertashop/rekonsiliasi', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-              ...(session.user.role === 'OWNER' || session.user.role === 'MANAGER'
+              ...(isStaff
+                ? [{ label: 'Input Penjualan', href: '/pertashop/penjualan', icon: 'M12 4v16m8-8H4' }]
+                : [{ label: 'Semua Transaksi', href: '/pertashop/transaksi', icon: 'M12 4v16m8-8H4' },
+                   { label: 'Rekonsiliasi', href: '/pertashop/rekonsiliasi', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' }]),
+              ...(session.user.role === 'OWNER'
                 ? [{ label: 'Laporan Laba/Rugi', href: '/pertashop/laporan', icon: 'M9 19v-6a2 2 0 012-2h2a2 2 0 012 2v6m-9 0h10a2 2 0 002-2V7a2 2 0 00-2-2h-3l-2-2H8a2 2 0 00-2 2v13a2 2 0 002 2z' }]
                 : []),
             ].map((nav) => (

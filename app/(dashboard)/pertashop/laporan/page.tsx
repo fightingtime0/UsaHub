@@ -46,7 +46,7 @@ export default async function LaporanPertashopPage({
   const searchParams = await searchParamsRaw
   const session = await getSession()
   if (!session) redirect('/login')
-  if (!['OWNER', 'MANAGER'].includes(session.user.role)) redirect('/pertashop')
+  if (session.user.role !== 'OWNER') redirect('/pertashop')
 
   const monthStr = searchParams.month
   const now = monthStr ? new Date(`${monthStr}-01`) : new Date()

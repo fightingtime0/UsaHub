@@ -38,27 +38,34 @@ export function TransaksiClient({
   role,
   employees,
   currentEmployeeId,
+  lockedDirection,
+  lockedReadingType,
 }: {
   products: ProductLite[]
   log: LogEntry[]
   role: string
   employees: EmployeeLite[]
   currentEmployeeId: string | null
+  /** Kalau diisi, mode Masuk/Keluar/Stok Sekarang dikunci (toggle disembunyikan) — dipakai oleh
+   *  entry point terpisah per peran (Input Belanja, Input Penjualan, Input Stok Awal). */
+  lockedDirection?: 'IN' | 'OUT' | 'STOK'
+  lockedReadingType?: 'OPENING' | 'CLOSING'
 }) {
   const router = useRouter()
   const canManageProduct = ['OWNER', 'MANAGER'].includes(role)
   const isOwner = role === 'OWNER'
+  const isStaff = role === 'STAFF'
 
   // ── Laporan Shift — satu form, satu kali simpan ────────────
   const [loading, setLoading] = useState(false)
   const [shift, setShift] = useState('')
   const [employeeId, setEmployeeId] = useState(currentEmployeeId ?? '')
-  const [direction, setDirection] = useState<'IN' | 'OUT' | 'STOK'>('IN')
+  const [direction, setDirection] = useState<'IN' | 'OUT' | 'STOK'>(lockedDirection ?? 'IN')
   const [productId, setProductId] = useState(products[0]?.id ?? '')
   const [liters, setLiters] = useState('')
   const [price, setPrice] = useState(products[0] ? String(products[0].buyPrice) : '')
   const [actualStock, setActualStock] = useState('')
-  const [readingType, setReadingType] = useState<'OPENING' | 'CLOSING'>('OPENING')
+  const [readingType, setReadingType] = useState<'OPENING' | 'CLOSING'>(lockedReadingType ?? 'OPENING')
   const [date, setDate] = useState(todayStr())
   const [depositAmount, setDepositAmount] = useState('')
   const [note, setNote] = useState('')
@@ -277,7 +284,15 @@ export function TransaksiClient({
           </svg>
         </Link>
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Laporan Shift Pertashop</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">
+            {lockedDirection === 'IN'
+              ? 'Input Belanja'
+              : lockedDirection === 'OUT'
+                ? 'Input Penjualan'
+                : lockedDirection === 'STOK'
+                  ? 'Input Stok Awal'
+                  : 'Laporan Shift Pertashop'}
+          </h1>
           <p className="text-xs md:text-sm text-gray-500">Satu form: transaksi, biaya pengeluaran, dan setoran — simpan sekali jalan</p>
         </div>
       </div>
@@ -313,32 +328,34 @@ export function TransaksiClient({
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button" onClick={() => onDirectionChange('IN')}
-                className={`py-2 rounded-lg text-xs sm:text-sm font-semibold border transition-colors ${
-                  direction === 'IN' ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                Masuk (Stok)
-              </button>
-              <button
-                type="button" onClick={() => onDirectionChange('OUT')}
-                className={`py-2 rounded-lg text-xs sm:text-sm font-semibold border transition-colors ${
-                  direction === 'OUT' ? 'bg-sky-600 border-sky-600 text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                Keluar (Jual)
-              </button>
-              <button
-                type="button" onClick={() => onDirectionChange('STOK')}
-                className={`py-2 rounded-lg text-xs sm:text-sm font-semibold border transition-colors ${
-                  direction === 'STOK' ? 'bg-amber-500 border-amber-500 text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                Stok Sekarang
-              </button>
-            </div>
+            {!lockedDirection && (
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button" onClick={() => onDirectionChange('IN')}
+                  className={`py-2 rounded-lg text-xs sm:text-sm font-semibold border transition-colors ${
+                    direction === 'IN' ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Masuk (Stok)
+                </button>
+                <button
+                  type="button" onClick={() => onDirectionChange('OUT')}
+                  className={`py-2 rounded-lg text-xs sm:text-sm font-semibold border transition-colors ${
+                    direction === 'OUT' ? 'bg-sky-600 border-sky-600 text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Keluar (Jual)
+                </button>
+                <button
+                  type="button" onClick={() => onDirectionChange('STOK')}
+                  className={`py-2 rounded-lg text-xs sm:text-sm font-semibold border transition-colors ${
+                    direction === 'STOK' ? 'bg-amber-500 border-amber-500 text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Stok Sekarang
+                </button>
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Produk BBM</label>
@@ -365,6 +382,16 @@ export function TransaksiClient({
                   <option value="OPENING">Buka (awal shift)</option>
                   <option value="CLOSING">Tutup (akhir shift)</option>
                 </select>
+              </div>
+            ) : isStaff && direction === 'IN' ? (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Jumlah (L)</label>
+                <input
+                  type="number" step="0.001" min="0.001" required value={liters}
+                  onChange={(e) => setLiters(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <p className="text-xs text-gray-400 mt-1">Harga beli diatur oleh Admin/Owner, mengikuti harga sistem saat ini.</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3">
