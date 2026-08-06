@@ -34,7 +34,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json(unit, { status: 201 })
 }
 
-// PATCH — toggle aktif/nonaktif salah satu unit bisnis milik tenant ini.
+// PATCH — toggle aktif/nonaktif dan/atau ganti nama salah satu unit bisnis milik tenant ini.
+// Rename unit sengaja cuma bisa dari sini (Superadmin), bukan dari /pengaturan Owner.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: tenantId } = await params
   const session = await getSession()
@@ -42,14 +43,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (session.user.role !== 'SUPERADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
-  const { unitId, isActive } = body
-  if (!unitId || typeof isActive !== 'boolean') {
-    return NextResponse.json({ error: 'unitId dan isActive wajib diisi' }, { status: 400 })
+  const { unitId, isActive, name } = body
+  if (!unitId || (typeof isActive !== 'boolean' && typeof name !== 'string')) {
+    return NextResponse.json({ error: 'unitId wajib diisi, beserta isActive dan/atau name' }, { status: 400 })
+  }
+
+  const data: { isActive?: boolean; name?: string } = {}
+  if (typeof isActive === 'boolean') data.isActive = isActive
+  if (typeof name === 'string') {
+    const trimmed = name.trim()
+    if (!trimmed) return NextResponse.json({ error: 'Nama tidak boleh kosong' }, { status: 400 })
+    data.name = trimmed
   }
 
   const result = await prisma.businessUnit.updateMany({
     where: { id: unitId, tenantId },
-    data: { isActive },
+    data,
   })
   if (result.count === 0) {
     return NextResponse.json({ error: 'Unit tidak ditemukan untuk tenant ini' }, { status: 404 })

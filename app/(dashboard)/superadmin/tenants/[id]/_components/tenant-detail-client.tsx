@@ -40,6 +40,8 @@ export function TenantDetailClient({
   const [addingType, setAddingType] = useState<UnitType | null>(null)
   const [newUnitName, setNewUnitName] = useState('')
   const [newUnitLocation, setNewUnitLocation] = useState('')
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
 
   async function handleToggleTenant() {
     if (!confirm(tenant.isActive ? `Suspend tenant "${tenant.name}"? Semua user tenant ini tidak akan bisa login.` : `Aktifkan kembali tenant "${tenant.name}"?`)) return
@@ -85,6 +87,34 @@ export function TenantDetailClient({
         return
       }
       setAddingType(null)
+      router.refresh()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function openRename(unit: BusinessUnitLite) {
+    setRenamingId(unit.id)
+    setRenameValue(unit.name)
+  }
+
+  async function handleRenameUnit(e: React.FormEvent, unitId: string) {
+    e.preventDefault()
+    if (!renameValue.trim()) return
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/superadmin/tenants/${tenant.id}/units`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unitId, name: renameValue.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? 'Gagal mengubah nama unit')
+        return
+      }
+      setRenamingId(null)
       router.refresh()
     } finally {
       setLoading(false)
@@ -185,6 +215,24 @@ export function TenantDetailClient({
                         </button>
                       </div>
                     </form>
+                  ) : unit && renamingId === unit.id ? (
+                    <form onSubmit={(e) => handleRenameUnit(e, unit.id)} className="space-y-2">
+                      <p className="text-sm font-medium text-gray-900">{TYPE_LABEL[type]}</p>
+                      <input
+                        type="text" required autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                      />
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => setRenamingId(null)}
+                          className="flex-1 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-600 hover:bg-gray-50">
+                          Batal
+                        </button>
+                        <button type="submit" disabled={loading}
+                          className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold">
+                          Simpan
+                        </button>
+                      </div>
+                    </form>
                   ) : (
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
@@ -205,9 +253,16 @@ export function TenantDetailClient({
                             {unit.isActive ? 'Aktif' : 'Nonaktif'}
                           </span>
                           <button
-                            onClick={() => handleToggleUnit(unit.id, unit.isActive)}
+                            onClick={() => openRename(unit)}
                             disabled={loading}
                             className="text-xs text-indigo-600 hover:underline font-medium disabled:opacity-50"
+                          >
+                            Ganti nama
+                          </button>
+                          <button
+                            onClick={() => handleToggleUnit(unit.id, unit.isActive)}
+                            disabled={loading}
+                            className="text-xs text-red-500 hover:underline font-medium disabled:opacity-50"
                           >
                             {unit.isActive ? 'Nonaktifkan' : 'Aktifkan'}
                           </button>

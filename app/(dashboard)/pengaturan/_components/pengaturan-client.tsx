@@ -71,24 +71,21 @@ function SiteNameCard({ initialSiteName }: { initialSiteName: string }) {
 
 function UnitRow({ unit }: { unit: Unit }) {
   const router = useRouter()
-  const [name, setName] = useState(unit.name)
   const [location, setLocation] = useState(unit.location ?? '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const dirty =
-    (name.trim() !== unit.name && name.trim().length > 0) ||
-    location.trim() !== (unit.location ?? '')
+  const dirty = location.trim() !== (unit.location ?? '')
 
   async function handleSave() {
-    if (!dirty || !name.trim()) return
+    if (!dirty) return
     setError('')
     setLoading(true)
     try {
       const res = await fetch(`/api/settings/units/${unit.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), location: location.trim() }),
+        body: JSON.stringify({ location: location.trim() }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -107,11 +104,9 @@ function UnitRow({ unit }: { unit: Unit }) {
         <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-600 flex-shrink-0">
           {UNIT_TYPE_LABEL[unit.type] ?? unit.type}
         </span>
-        <input
-          value={name} onChange={(e) => setName(e.target.value)}
-          placeholder="Nama"
-          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-        />
+        <p className="flex-1 text-sm font-medium text-gray-800 px-1 py-2" title="Nama unit hanya bisa diubah oleh Superadmin">
+          {unit.name}
+        </p>
         <button
           onClick={handleSave} disabled={!dirty || loading}
           className="text-xs text-indigo-600 hover:underline font-medium disabled:text-gray-300 disabled:no-underline flex-shrink-0"
@@ -136,8 +131,8 @@ export function PengaturanClient({ siteName, units }: { siteName: string; units:
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
         <div className="px-4 md:px-5 py-3 md:py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900 text-sm md:text-base">Nama Unit Bisnis</h2>
-          <p className="text-xs text-gray-500 mt-0.5">Nama toko, homestay, restoran, penginapan, dan pertashop</p>
+          <h2 className="font-semibold text-gray-900 text-sm md:text-base">Unit Bisnis</h2>
+          <p className="text-xs text-gray-500 mt-0.5">Alamat/lokasi unit. Nama unit hanya bisa diubah oleh Superadmin.</p>
         </div>
         <div className="divide-y divide-gray-50">
           {units.length === 0 && (

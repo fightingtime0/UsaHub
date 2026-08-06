@@ -1,6 +1,7 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { getActiveUnitTypes } from '@/lib/tenant'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import {
   startOfMonth, endOfMonth, subMonths, format,
@@ -33,6 +34,9 @@ export default async function LaporanPage({
   if (!session) redirect('/login')
   if (!['OWNER', 'MANAGER'].includes(session.user.role)) redirect('/dashboard')
 
+  const tenantId = session.user.tenantId!
+  const activeTypes = new Set(await getActiveUnitTypes(tenantId))
+
   const monthStr = searchParams.month
   const now      = monthStr ? new Date(`${monthStr}-01`) : new Date()
   const mStart   = startOfMonth(now)
@@ -64,39 +68,39 @@ export default async function LaporanPage({
     openTables,
   ] = await Promise.all([
     prisma.transaction.aggregate({
-      where: { unit: { type: 'RETAIL' }, status: 'PAID', createdAt: { gte: mStart, lte: mEnd } },
+      where: { unit: { type: 'RETAIL', tenantId }, status: 'PAID', createdAt: { gte: mStart, lte: mEnd } },
       _sum: { total: true }, _count: { id: true },
     }),
     prisma.tableOrder.aggregate({
-      where: { unit: { type: 'RESTAURANT' }, status: 'PAID', paidAt: { gte: mStart, lte: mEnd } },
+      where: { unit: { type: 'RESTAURANT', tenantId }, status: 'PAID', paidAt: { gte: mStart, lte: mEnd } },
       _sum: { total: true }, _count: { id: true },
     }),
     prisma.booking.aggregate({
-      where: { unit: { type: 'LODGING' }, status: { in: ['CHECKED_IN', 'CHECKED_OUT'] }, checkIn: { gte: mStart, lte: mEnd } },
+      where: { unit: { type: 'LODGING', tenantId }, status: { in: ['CHECKED_IN', 'CHECKED_OUT'] }, checkIn: { gte: mStart, lte: mEnd } },
       _sum: { totalPrice: true }, _count: { id: true },
     }),
     prisma.booking.aggregate({
-      where: { unit: { type: 'HOMESTAY' }, status: { in: ['CHECKED_IN', 'CHECKED_OUT'] }, checkIn: { gte: mStart, lte: mEnd } },
+      where: { unit: { type: 'HOMESTAY', tenantId }, status: { in: ['CHECKED_IN', 'CHECKED_OUT'] }, checkIn: { gte: mStart, lte: mEnd } },
       _sum: { totalPrice: true }, _count: { id: true },
     }),
     prisma.fuelSale.aggregate({
-      where: { unit: { type: 'PERTASHOP' }, soldAt: { gte: mStart, lte: mEnd } },
+      where: { unit: { type: 'PERTASHOP', tenantId }, soldAt: { gte: mStart, lte: mEnd } },
       _sum: { total: true }, _count: { id: true },
     }),
     prisma.b2BInvoice.aggregate({
-      where: { status: 'PAID', paidAt: { gte: mStart, lte: mEnd } },
+      where: { status: 'PAID', paidAt: { gte: mStart, lte: mEnd }, sellerUnit: { tenantId } },
       _sum: { total: true }, _count: { id: true },
     }),
-    prisma.employee.count({ where: { isActive: true } }),
+    prisma.employee.count({ where: { isActive: true, primaryUnit: { tenantId } } }),
 
     // Trend 6 months
     Promise.all(trendMonths.map(async (m) => {
       const [t, r, p, h, f] = await Promise.all([
-        prisma.transaction.aggregate({ where: { unit: { type: 'RETAIL' }, status: 'PAID', createdAt: { gte: m.start, lte: m.end } }, _sum: { total: true } }),
-        prisma.tableOrder.aggregate({ where: { unit: { type: 'RESTAURANT' }, status: 'PAID', paidAt: { gte: m.start, lte: m.end } }, _sum: { total: true } }),
-        prisma.booking.aggregate({ where: { unit: { type: 'LODGING' }, status: { in: ['CHECKED_IN', 'CHECKED_OUT'] }, checkIn: { gte: m.start, lte: m.end } }, _sum: { totalPrice: true } }),
-        prisma.booking.aggregate({ where: { unit: { type: 'HOMESTAY' }, status: { in: ['CHECKED_IN', 'CHECKED_OUT'] }, checkIn: { gte: m.start, lte: m.end } }, _sum: { totalPrice: true } }),
-        prisma.fuelSale.aggregate({ where: { unit: { type: 'PERTASHOP' }, soldAt: { gte: m.start, lte: m.end } }, _sum: { total: true } }),
+        prisma.transaction.aggregate({ where: { unit: { type: 'RETAIL', tenantId }, status: 'PAID', createdAt: { gte: m.start, lte: m.end } }, _sum: { total: true } }),
+        prisma.tableOrder.aggregate({ where: { unit: { type: 'RESTAURANT', tenantId }, status: 'PAID', paidAt: { gte: m.start, lte: m.end } }, _sum: { total: true } }),
+        prisma.booking.aggregate({ where: { unit: { type: 'LODGING', tenantId }, status: { in: ['CHECKED_IN', 'CHECKED_OUT'] }, checkIn: { gte: m.start, lte: m.end } }, _sum: { totalPrice: true } }),
+        prisma.booking.aggregate({ where: { unit: { type: 'HOMESTAY', tenantId }, status: { in: ['CHECKED_IN', 'CHECKED_OUT'] }, checkIn: { gte: m.start, lte: m.end } }, _sum: { totalPrice: true } }),
+        prisma.fuelSale.aggregate({ where: { unit: { type: 'PERTASHOP', tenantId }, soldAt: { gte: m.start, lte: m.end } }, _sum: { total: true } }),
       ])
       return {
         label:      m.label,
@@ -112,28 +116,28 @@ export default async function LaporanPage({
     prisma.$queryRaw<{ name: string; stock: number; minStock: number; unit_name: string }[]>`
       SELECT p.name, CAST(p.stock AS FLOAT) as stock, CAST(p."minStock" AS FLOAT) as "minStock", bu.name as unit_name
       FROM products p JOIN business_units bu ON p."unitId" = bu.id
-      WHERE p."isActive" = true AND p.stock <= p."minStock" AND p."minStock" > 0
+      WHERE p."isActive" = true AND p.stock <= p."minStock" AND p."minStock" > 0 AND bu."tenantId" = ${tenantId}
       ORDER BY (p.stock / NULLIF(p."minStock", 0)) ASC
       LIMIT 8
     `,
 
     prisma.booking.findMany({
-      where: { status: { in: ['CONFIRMED', 'CHECKED_IN'] }, checkIn: { gte: today, lte: todayEnd } },
+      where: { status: { in: ['CONFIRMED', 'CHECKED_IN'] }, checkIn: { gte: today, lte: todayEnd }, unit: { tenantId } },
       include: { room: { select: { name: true } }, unit: { select: { name: true, type: true } } },
       orderBy: { checkIn: 'asc' },
     }),
     prisma.booking.findMany({
-      where: { status: 'CHECKED_IN', checkOut: { gte: today, lte: todayEnd } },
+      where: { status: 'CHECKED_IN', checkOut: { gte: today, lte: todayEnd }, unit: { tenantId } },
       include: { room: { select: { name: true } }, unit: { select: { name: true, type: true } } },
     }),
     prisma.booking.findMany({
-      where: { status: { in: ['CONFIRMED', 'PENDING'] }, checkIn: { gt: today, lte: next7 } },
+      where: { status: { in: ['CONFIRMED', 'PENDING'] }, checkIn: { gt: today, lte: next7 }, unit: { tenantId } },
       include: { unit: { select: { name: true, type: true } } },
       orderBy: { checkIn: 'asc' },
       take: 5,
     }),
-    prisma.purchaseOrder.count({ where: { status: { in: ['DRAFT', 'ORDERED'] } } }),
-    prisma.tableOrder.count({ where: { status: { in: ['OPEN', 'BILLED'] } } }),
+    prisma.purchaseOrder.count({ where: { status: { in: ['DRAFT', 'ORDERED'] }, unit: { tenantId } } }),
+    prisma.tableOrder.count({ where: { status: { in: ['OPEN', 'BILLED'] }, unit: { tenantId } } }),
   ])
 
   const tokoRev       = Number(tokoRevenue._sum.total ?? 0)
@@ -149,7 +153,7 @@ export default async function LaporanPage({
     { label: 'Penginapan',   type: 'LODGING',     revenue: penginapanRev, count: Number(penginapanRevenue._count.id) },
     { label: 'Homestay',     type: 'HOMESTAY',    revenue: homestayRev,   count: Number(homestayRevenue._count.id)   },
     { label: 'Pertashop',    type: 'PERTASHOP',   revenue: pertashopRev,  count: Number(pertashopRevenue._count.id)  },
-  ]
+  ].filter((u) => activeTypes.has(u.type as any))
 
   const maxRevenue = Math.max(...unitData.map((u) => u.revenue), 1)
 
@@ -160,8 +164,15 @@ export default async function LaporanPage({
 
   const currentMonthLabel = format(now, 'MMMM yyyy')
 
-  // Trend max for bar chart
-  const trendMax = Math.max(...trendData.map((t) => t.toko + t.restoran + t.penginapan + t.homestay + t.pertashop), 1)
+  // Trend max for bar chart — hanya hitung dari unit yang aktif
+  const trendSeries = [
+    { key: 'toko' as const,       type: 'RETAIL',     label: 'Toko',       color: 'bg-sky-400'    },
+    { key: 'restoran' as const,   type: 'RESTAURANT', label: 'Restoran',   color: 'bg-orange-400' },
+    { key: 'penginapan' as const, type: 'LODGING',    label: 'Penginapan', color: 'bg-purple-400' },
+    { key: 'homestay' as const,   type: 'HOMESTAY',   label: 'Homestay',   color: 'bg-teal-400'   },
+    { key: 'pertashop' as const,  type: 'PERTASHOP',  label: 'Pertashop',  color: 'bg-emerald-400' },
+  ].filter((s) => activeTypes.has(s.type as any))
+  const trendMax = Math.max(...trendData.map((t) => trendSeries.reduce((s, series) => s + t[series.key], 0)), 1)
 
   return (
     <div className="space-y-6">
@@ -218,8 +229,12 @@ export default async function LaporanPage({
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Status Operasional</h2>
           <div className="space-y-3">
             {[
-              { label: 'Meja Aktif Restoran',  value: String(openTables),      href: '/restoran',  color: 'text-orange-600' },
-              { label: 'PO Menunggu',           value: String(pendingPO),       href: '/toko/pembelian', color: 'text-sky-600' },
+              ...(activeTypes.has('RESTAURANT' as any)
+                ? [{ label: 'Meja Aktif Restoran', value: String(openTables), href: '/restoran', color: 'text-orange-600' }]
+                : []),
+              ...(activeTypes.has('RETAIL' as any)
+                ? [{ label: 'PO Menunggu', value: String(pendingPO), href: '/toko/pembelian', color: 'text-sky-600' }]
+                : []),
               { label: 'B2B Invoice Lunas/bln', value: String(Number(b2bPaid._count.id)), href: '/b2b', color: 'text-indigo-600' },
               { label: 'Total Karyawan Aktif',  value: String(employeeCount),   href: '/sdm',       color: 'text-gray-700' },
             ].map((item) => (
@@ -302,7 +317,7 @@ export default async function LaporanPage({
         <h2 className="text-sm font-semibold text-gray-700 mb-5">Tren Pendapatan 6 Bulan</h2>
         <div className="flex items-end gap-3 h-36">
           {trendData.map((m) => {
-            const total = m.toko + m.restoran + m.penginapan + m.homestay + m.pertashop
+            const total = trendSeries.reduce((s, series) => s + m[series.key], 0)
             const pct   = (total / trendMax) * 100
             const isCurrentM = m.label === format(now, 'MMM yy')
             return (
@@ -311,15 +326,9 @@ export default async function LaporanPage({
                 <div className="w-full relative" style={{ height: `${Math.max(pct, 4)}%` }}>
                   {/* Stacked bar */}
                   <div className="w-full h-full rounded-t-lg overflow-hidden flex flex-col-reverse">
-                    {[
-                      { val: m.toko,       color: 'bg-sky-400'     },
-                      { val: m.restoran,   color: 'bg-orange-400'  },
-                      { val: m.penginapan, color: 'bg-purple-400'  },
-                      { val: m.homestay,   color: 'bg-teal-400'    },
-                      { val: m.pertashop,  color: 'bg-emerald-400' },
-                    ].map(({ val, color }) => (
+                    {trendSeries.map(({ key, color }) => (
                       <div key={color} className={`${color} w-full`}
-                        style={{ height: total > 0 ? `${(val / total) * 100}%` : '0%' }} />
+                        style={{ height: total > 0 ? `${(m[key] / total) * 100}%` : '0%' }} />
                     ))}
                   </div>
                 </div>
@@ -330,13 +339,7 @@ export default async function LaporanPage({
         </div>
         {/* Legend */}
         <div className="flex flex-wrap gap-4 mt-4 pt-3 border-t border-gray-50">
-          {[
-            { label: 'Toko',      color: 'bg-sky-400'     },
-            { label: 'Restoran',  color: 'bg-orange-400'  },
-            { label: 'Penginapan',color: 'bg-purple-400'  },
-            { label: 'Homestay',  color: 'bg-teal-400'    },
-            { label: 'Pertashop', color: 'bg-emerald-400' },
-          ].map((item) => (
+          {trendSeries.map((item) => (
             <div key={item.label} className="flex items-center gap-1.5">
               <div className={`w-3 h-3 rounded-sm ${item.color}`} />
               <span className="text-xs text-gray-500">{item.label}</span>

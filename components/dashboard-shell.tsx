@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { Sidebar } from './sidebar'
-import type { Role } from '@prisma/client'
+import type { Role, UnitType } from '@prisma/client'
 
 type User = {
   name: string
@@ -15,10 +15,12 @@ type User = {
 export function DashboardShell({
   user,
   siteName,
+  units,
   children,
 }: {
   user: User
   siteName: string
+  units: { type: UnitType; name: string }[]
   children: React.ReactNode
 }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false)
@@ -56,6 +58,7 @@ export function DashboardShell({
       <Sidebar
         user={user}
         siteName={siteName}
+        units={units}
         isMobileOpen={isMobileOpen}
         onClose={() => setIsMobileOpen(false)}
       />

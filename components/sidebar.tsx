@@ -3,14 +3,14 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
-import type { Role } from '@prisma/client'
+import type { Role, UnitType } from '@prisma/client'
 
 type NavItem = {
   label: string
   href: string
   icon: React.ReactNode
   roles?: Role[]
-  unitTypes?: string[]
+  unitTypes?: UnitType[]
 }
 
 const Icon = ({ d }: { d: string }) => (
@@ -105,14 +105,25 @@ const SUPERADMIN_NAV_ITEMS: NavItem[] = [
   },
 ]
 
-function filterNavItems(role: Role, unitType: string | null): NavItem[] {
+function filterNavItems(role: Role, unitType: string | null, units: { type: UnitType; name: string }[]): NavItem[] {
   if (role === 'SUPERADMIN') return SUPERADMIN_NAV_ITEMS
+  const activeTypes = new Set(units.map((u) => u.type))
+  const nameByType = new Map(units.map((u) => [u.type, u.name]))
+
   return NAV_ITEMS.filter((item) => {
     const roleOk = !item.roles || item.roles.includes(role)
     if (!roleOk) return false
-    if (role === 'OWNER') return true
     if (!item.unitTypes) return true
-    return unitType ? item.unitTypes.includes(unitType) : false
+    // Unit-linked menu hanya tampil kalau unit jenis itu memang aktif untuk tenant ini —
+    // OWNER tidak lagi bypass ini (dulu OWNER selalu lihat semua 5 jenis walau belum dinyalakan).
+    const hasActiveUnit = item.unitTypes.some((t) => activeTypes.has(t))
+    if (!hasActiveUnit) return false
+    if (role === 'OWNER') return true
+    return unitType ? item.unitTypes.includes(unitType as UnitType) : false
+  }).map((item) => {
+    if (!item.unitTypes) return item
+    const realName = nameByType.get(item.unitTypes[0])
+    return realName ? { ...item, label: realName } : item
   })
 }
 
@@ -132,15 +143,17 @@ type SidebarProps = {
     primaryUnitType: string | null
   }
   siteName: string
+  /** Unit aktif tenant ini — dipakai untuk filter menu & label nama asli unit */
+  units: { type: UnitType; name: string }[]
   /** Apakah sidebar terbuka di mobile (diatur dari DashboardShell) */
   isMobileOpen?: boolean
   /** Callback untuk menutup sidebar di mobile */
   onClose?: () => void
 }
 
-export function Sidebar({ user, siteName, isMobileOpen = false, onClose }: SidebarProps) {
+export function Sidebar({ user, siteName, units, isMobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname()
-  const navItems = filterNavItems(user.role, user.primaryUnitType)
+  const navItems = filterNavItems(user.role, user.primaryUnitType, units)
 
   // Saat item nav diklik di mobile → tutup sidebar
   function handleNavClick() {

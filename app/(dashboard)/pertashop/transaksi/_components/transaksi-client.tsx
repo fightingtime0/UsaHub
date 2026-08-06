@@ -104,9 +104,12 @@ export function TransaksiClient({
   const actualNum = actualStock === '' ? null : parseFloat(actualStock)
   const selisih = actualNum !== null ? expectedStock - actualNum : null
   const total = litersNum * (parseFloat(price) || 0)
+  // "Laporan jualan" cuma berlaku untuk transaksi Keluar (Jual) — Masuk (Belanja) itu uang
+  // KELUAR untuk beli stok, bukan hasil penjualan, jadi tidak dihitung sebagai jualan hari ini.
+  const salesTotal = direction === 'OUT' ? total : 0
 
-  // Laporan ini sekaligus laporan setoran: setoran seharusnya = transaksi hari ini − biaya pengeluaran
-  const setoranSeharusnya = total - expenseTotal
+  // Laporan ini sekaligus laporan setoran: setoran seharusnya = jualan hari ini − biaya pengeluaran
+  const setoranSeharusnya = salesTotal - expenseTotal
   const depositDiff = depositAmount !== '' ? parseFloat(depositAmount) - setoranSeharusnya : null
 
   function handleAddExpense() {
@@ -488,7 +491,7 @@ export function TransaksiClient({
             <div className="rounded-lg bg-gray-50 p-3 space-y-1 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-500 text-xs">Laporan jualan hari ini</span>
-                <span className="font-semibold text-gray-900">{formatRupiah(total)}</span>
+                <span className="font-semibold text-gray-900">{formatRupiah(salesTotal)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500 text-xs">Biaya pengeluaran</span>
