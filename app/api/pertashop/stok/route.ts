@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   if (!hasUnitAccess(session, 'PERTASHOP')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
-  const { fuelProductId, type, date, actualLiters, note } = body
+  const { fuelProductId, type, date, actualLiters, shift, note } = body
 
   if (!fuelProductId || !type || !date || actualLiters === undefined) {
     return NextResponse.json({ error: 'Produk, jenis, tanggal, dan hasil ukur wajib diisi' }, { status: 400 })
@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
           expectedLiters: expected,
           actualLiters: actual,
           lossLiters: loss,
+          shift: shift || null,
           note: note ?? null,
           fuelProductId,
           unitId: product.unitId,

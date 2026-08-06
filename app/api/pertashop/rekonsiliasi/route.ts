@@ -16,16 +16,26 @@ export async function GET(req: NextRequest) {
   const dateParam = req.nextUrl.searchParams.get('date')
   if (dateParam) {
     const day = new Date(dateParam)
-    const agg = await prisma.fuelSale.aggregate({
-      where: { unitId: unit.id, soldAt: { gte: startOfDay(day), lte: endOfDay(day) } },
-      _sum: { total: true, liters: true },
-      _count: true,
-    })
+    const [agg, expenseAgg] = await Promise.all([
+      prisma.fuelSale.aggregate({
+        where: { unitId: unit.id, soldAt: { gte: startOfDay(day), lte: endOfDay(day) } },
+        _sum: { total: true, liters: true },
+        _count: true,
+      }),
+      prisma.fuelExpense.aggregate({
+        where: { unitId: unit.id, date: { gte: startOfDay(day), lte: endOfDay(day) } },
+        _sum: { amount: true },
+      }),
+    ])
+    const reportedSales = Number(agg._sum.total ?? 0)
+    const totalExpenses = Number(expenseAgg._sum.amount ?? 0)
     return NextResponse.json({
       date: dateParam,
-      reportedSales: Number(agg._sum.total ?? 0),
+      reportedSales,
       totalLiters: Number(agg._sum.liters ?? 0),
       saleCount: agg._count,
+      totalExpenses,
+      netExpected: reportedSales - totalExpenses,
     })
   }
 
@@ -55,19 +65,28 @@ export async function POST(req: NextRequest) {
   if (!unit) return NextResponse.json({ error: 'Unit Pertashop tidak ditemukan' }, { status: 404 })
 
   const day = new Date(date)
-  const agg = await prisma.fuelSale.aggregate({
-    where: { unitId: unit.id, soldAt: { gte: startOfDay(day), lte: endOfDay(day) } },
-    _sum: { total: true },
-  })
+  const [agg, expenseAgg] = await Promise.all([
+    prisma.fuelSale.aggregate({
+      where: { unitId: unit.id, soldAt: { gte: startOfDay(day), lte: endOfDay(day) } },
+      _sum: { total: true },
+    }),
+    prisma.fuelExpense.aggregate({
+      where: { unitId: unit.id, date: { gte: startOfDay(day), lte: endOfDay(day) } },
+      _sum: { amount: true },
+    }),
+  ])
   const reportedSales = Number(agg._sum.total ?? 0)
+  const expenseAmount = Number(expenseAgg._sum.amount ?? 0)
   const deposit = Number(depositAmount)
-  const difference = deposit - reportedSales
+  // Setoran seharusnya = laporan jualan − biaya pengeluaran (diambil langsung dari uang jualan)
+  const difference = deposit - (reportedSales - expenseAmount)
 
   try {
     const recon = await prisma.fuelReconciliation.create({
       data: {
         date: day,
         reportedSales,
+        expenseAmount,
         depositAmount: deposit,
         difference,
         note: note ?? null,

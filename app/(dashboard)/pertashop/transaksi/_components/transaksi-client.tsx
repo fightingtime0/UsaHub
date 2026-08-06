@@ -8,11 +8,11 @@ import { formatRupiah, formatDateTime } from '@/lib/utils'
 type ProductLite = { id: string; name: string; stock: number; buyPrice: number; sellPrice: number }
 type LogEntry = {
   id: string
-  direction: 'IN' | 'OUT'
+  direction: 'IN' | 'OUT' | 'STOK'
   productName: string
-  liters: number
-  price: number
-  total: number
+  liters: number | null
+  price: number | null
+  total: number | null
   shift: string | null
   actualStock: number | null
   lossLiters: number | null
@@ -22,18 +22,27 @@ type LogEntry = {
 
 const RESET_CONFIRM_PHRASE = 'RESET PERTASHOP'
 
+function todayStr() {
+  const d = new Date()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
+}
+
 export function TransaksiClient({ products, log, role }: { products: ProductLite[]; log: LogEntry[]; role: string }) {
   const router = useRouter()
   const canManageProduct = ['OWNER', 'MANAGER'].includes(role)
   const isOwner = role === 'OWNER'
 
-  // ── Form transaksi (masuk/keluar) ──────────────────────────
+  // ── Form transaksi (masuk/keluar/stok sekarang) ────────────
   const [loading, setLoading] = useState(false)
-  const [direction, setDirection] = useState<'IN' | 'OUT'>('IN')
+  const [direction, setDirection] = useState<'IN' | 'OUT' | 'STOK'>('IN')
   const [productId, setProductId] = useState(products[0]?.id ?? '')
   const [liters, setLiters] = useState('')
   const [price, setPrice] = useState(products[0] ? String(products[0].buyPrice) : '')
   const [actualStock, setActualStock] = useState('')
+  const [readingType, setReadingType] = useState<'OPENING' | 'CLOSING'>('OPENING')
+  const [readingDate, setReadingDate] = useState(todayStr())
   const [shift, setShift] = useState('')
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
@@ -44,21 +53,23 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
     setPrice(prod ? String(dir === 'IN' ? prod.buyPrice : prod.sellPrice) : '')
   }
 
-  function onDirectionChange(dir: 'IN' | 'OUT') {
+  function onDirectionChange(dir: 'IN' | 'OUT' | 'STOK') {
     setDirection(dir)
-    applyDefaultPrice(dir, selectedProduct)
+    if (dir !== 'STOK') applyDefaultPrice(dir, selectedProduct)
   }
 
   function onProductChange(id: string) {
     setProductId(id)
-    applyDefaultPrice(direction, products.find((p) => p.id === id) ?? null)
+    if (direction !== 'STOK') applyDefaultPrice(direction, products.find((p) => p.id === id) ?? null)
   }
 
   const litersNum = parseFloat(liters) || 0
   const expectedStock = selectedProduct
     ? direction === 'IN'
       ? selectedProduct.stock + litersNum
-      : selectedProduct.stock - litersNum
+      : direction === 'OUT'
+        ? selectedProduct.stock - litersNum
+        : selectedProduct.stock
     : 0
   const actualNum = actualStock === '' ? null : parseFloat(actualStock)
   const selisih = actualNum !== null ? expectedStock - actualNum : null
@@ -72,11 +83,14 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
 
     setLoading(true)
     try {
-      const url = direction === 'IN' ? '/api/pertashop/belanja' : '/api/pertashop/penjualan'
+      const url =
+        direction === 'IN' ? '/api/pertashop/belanja' : direction === 'OUT' ? '/api/pertashop/penjualan' : '/api/pertashop/stok'
       const payload =
         direction === 'IN'
           ? { fuelProductId: productId, liters: litersNum, buyPrice: parseFloat(price), actualStock: actualNum, shift: shift || null, note: note || null }
-          : { fuelProductId: productId, liters: litersNum, sellPrice: parseFloat(price), actualStock: actualNum, shift: shift || null, note: note || null }
+          : direction === 'OUT'
+            ? { fuelProductId: productId, liters: litersNum, sellPrice: parseFloat(price), actualStock: actualNum, shift: shift || null, note: note || null }
+            : { fuelProductId: productId, type: readingType, date: readingDate, actualLiters: actualNum, shift: shift || null, note: note || null }
 
       const res = await fetch(url, {
         method: 'POST',
@@ -216,10 +230,10 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
         {/* Form + kelola produk */}
         <div className="space-y-4">
           <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 md:p-5 space-y-3">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button" onClick={() => onDirectionChange('IN')}
-                className={`py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                className={`py-2 rounded-lg text-xs sm:text-sm font-semibold border transition-colors ${
                   direction === 'IN' ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                 }`}
               >
@@ -227,13 +241,27 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
               </button>
               <button
                 type="button" onClick={() => onDirectionChange('OUT')}
-                className={`py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                className={`py-2 rounded-lg text-xs sm:text-sm font-semibold border transition-colors ${
                   direction === 'OUT' ? 'bg-sky-600 border-sky-600 text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                 }`}
               >
                 Keluar (Jual)
               </button>
+              <button
+                type="button" onClick={() => onDirectionChange('STOK')}
+                className={`py-2 rounded-lg text-xs sm:text-sm font-semibold border transition-colors ${
+                  direction === 'STOK' ? 'bg-amber-500 border-amber-500 text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                Stok Sekarang
+              </button>
             </div>
+
+            {direction === 'STOK' && (
+              <p className="text-xs text-gray-400 -mt-1">
+                Lapor hasil ukur tangki tanpa transaksi belanja/jual — biasanya dipakai shift 1 (buka) untuk laporan stok awal.
+              </p>
+            )}
 
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Produk BBM</label>
@@ -250,24 +278,47 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
               </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Jumlah (L)</label>
-                <input
-                  type="number" step="0.001" min="0.001" required value={liters}
-                  onChange={(e) => setLiters(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
+            {direction === 'STOK' ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Tanggal</label>
+                  <input
+                    type="date" required value={readingDate}
+                    onChange={(e) => setReadingDate(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Jenis</label>
+                  <select
+                    value={readingType} onChange={(e) => setReadingType(e.target.value as 'OPENING' | 'CLOSING')}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="OPENING">Buka (awal shift)</option>
+                    <option value="CLOSING">Tutup (akhir shift)</option>
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Harga / L</label>
-                <input
-                  type="number" step="1" min="1" required value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Jumlah (L)</label>
+                  <input
+                    type="number" step="0.001" min="0.001" required value={liters}
+                    onChange={(e) => setLiters(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Harga / L</label>
+                  <input
+                    type="number" step="1" min="1" required value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Stok Sekarang (hasil ukur tangki) *</label>
@@ -311,20 +362,22 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
               />
             </div>
 
-            <div className="flex items-center justify-between pt-1">
-              <span className="text-xs text-gray-500">Total</span>
-              <span className="font-bold text-gray-900">{formatRupiah(total)}</span>
-            </div>
+            {direction !== 'STOK' && (
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-xs text-gray-500">Total</span>
+                <span className="font-bold text-gray-900">{formatRupiah(total)}</span>
+              </div>
+            )}
 
             {error && <p className="text-sm text-red-600">{error}</p>}
 
             <button
               type="submit" disabled={loading || !productId}
               className={`w-full text-white rounded-lg py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 ${
-                direction === 'IN' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'
+                direction === 'IN' ? 'bg-emerald-600 hover:bg-emerald-700' : direction === 'OUT' ? 'bg-sky-600 hover:bg-sky-700' : 'bg-amber-500 hover:bg-amber-600'
               }`}
             >
-              {loading ? 'Menyimpan...' : direction === 'IN' ? 'Simpan Stok Masuk' : 'Simpan Penjualan'}
+              {loading ? 'Menyimpan...' : direction === 'IN' ? 'Simpan Stok Masuk' : direction === 'OUT' ? 'Simpan Penjualan' : 'Simpan Laporan Stok'}
             </button>
           </form>
 
@@ -457,15 +510,15 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
                     <td className="px-4 md:px-5 py-3 text-gray-600 whitespace-nowrap">{formatDateTime(t.at)}</td>
                     <td className="px-3 py-3">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                        t.direction === 'IN' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'
+                        t.direction === 'IN' ? 'bg-emerald-100 text-emerald-700' : t.direction === 'OUT' ? 'bg-sky-100 text-sky-700' : 'bg-amber-100 text-amber-700'
                       }`}>
-                        {t.direction === 'IN' ? 'Masuk' : 'Keluar'}
+                        {t.direction === 'IN' ? 'Masuk' : t.direction === 'OUT' ? 'Keluar' : 'Stok'}
                       </span>
                     </td>
                     <td className="px-3 py-3 font-medium text-gray-900 whitespace-nowrap">{t.productName}</td>
-                    <td className="px-3 py-3 text-right text-gray-800">{t.liters.toLocaleString('id-ID', { maximumFractionDigits: 3 })}</td>
-                    <td className="px-3 py-3 text-right text-gray-600">{formatRupiah(t.price)}</td>
-                    <td className="px-3 py-3 text-right font-semibold text-gray-900">{formatRupiah(t.total)}</td>
+                    <td className="px-3 py-3 text-right text-gray-800">{t.liters !== null ? t.liters.toLocaleString('id-ID', { maximumFractionDigits: 3 }) : '—'}</td>
+                    <td className="px-3 py-3 text-right text-gray-600">{t.price !== null ? formatRupiah(t.price) : '—'}</td>
+                    <td className="px-3 py-3 text-right font-semibold text-gray-900">{t.total !== null ? formatRupiah(t.total) : '—'}</td>
                     <td className="px-3 py-3 text-right text-gray-700">
                       {t.actualStock !== null ? t.actualStock.toLocaleString('id-ID', { maximumFractionDigits: 2 }) : '—'}
                     </td>

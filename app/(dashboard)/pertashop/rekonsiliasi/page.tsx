@@ -22,6 +22,7 @@ export default async function RekonsiliasiPage() {
         id: r.id,
         date: r.date.toISOString(),
         reportedSales: Number(r.reportedSales),
+        expenseAmount: Number(r.expenseAmount),
         depositAmount: Number(r.depositAmount),
         difference: Number(r.difference),
         note: r.note,

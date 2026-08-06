@@ -188,6 +188,7 @@ model BusinessUnit {
   fuelSales           FuelSale[]
   fuelStockReadings   FuelStockReading[]
   fuelReconciliations FuelReconciliation[]
+  fuelExpenses        FuelExpense[]
   groupOrders         GroupOrder[]
 
   @@map("business_units")
@@ -744,6 +745,7 @@ model FuelStockReading {
   expectedLiters Decimal         @db.Decimal(12, 3) // stok seharusnya menurut sistem
   actualLiters   Decimal         @db.Decimal(12, 3) // hasil ukur tangki
   lossLiters     Decimal         @db.Decimal(12, 3) // expected − actual
+  shift          String? // shift yang melapor (biasanya shift 1 untuk OPENING)
   note           String?
   createdAt      DateTime        @default(now())
 
@@ -763,8 +765,9 @@ model FuelReconciliation {
   id            String   @id @default(cuid())
   date          DateTime @db.Date
   reportedSales Decimal  @db.Decimal(14, 2) // total FuelSale hari itu
+  expenseAmount Decimal  @default(0) @db.Decimal(14, 2) // total biaya pengeluaran hari itu (mengurangi setoran)
   depositAmount Decimal  @db.Decimal(14, 2) // setoran uang aktual
-  difference    Decimal  @db.Decimal(14, 2) // depositAmount − reportedSales
+  difference    Decimal  @db.Decimal(14, 2) // depositAmount − (reportedSales − expenseAmount)
   note          String?
   createdAt     DateTime @default(now())
 
@@ -773,6 +776,23 @@ model FuelReconciliation {
 
   @@unique([unitId, date])
   @@map("fuel_reconciliations")
+}
+
+// Biaya pengeluaran tunai selama shift (mis. beli oli, parkir, dll) yang diambil
+// langsung dari uang hasil jualan, sehingga mengurangi jumlah yang harus disetor.
+model FuelExpense {
+  id          String   @id @default(cuid())
+  date        DateTime @db.Date
+  shift       String?
+  amount      Decimal  @db.Decimal(14, 2)
+  description String
+  createdAt   DateTime @default(now())
+
+  unitId String
+  unit   BusinessUnit @relation(fields: [unitId], references: [id])
+
+  @@index([unitId, date])
+  @@map("fuel_expenses")
 }
 
 // ============================================================

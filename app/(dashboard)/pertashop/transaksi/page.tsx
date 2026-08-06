@@ -10,7 +10,7 @@ export default async function TransaksiPage() {
   const unit = await prisma.businessUnit.findFirst({ where: { type: 'PERTASHOP', isActive: true } })
   if (!unit) return <p className="text-red-500">Unit Pertashop tidak ditemukan.</p>
 
-  const [products, purchases, sales] = await Promise.all([
+  const [products, purchases, sales, readings] = await Promise.all([
     prisma.fuelProduct.findMany({ where: { unitId: unit.id, isActive: true }, orderBy: { name: 'asc' } }),
     prisma.fuelPurchase.findMany({
       where: { unitId: unit.id },
@@ -22,6 +22,12 @@ export default async function TransaksiPage() {
       where: { unitId: unit.id },
       include: { fuelProduct: { select: { name: true } } },
       orderBy: { soldAt: 'desc' },
+      take: 60,
+    }),
+    prisma.fuelStockReading.findMany({
+      where: { unitId: unit.id },
+      include: { fuelProduct: { select: { name: true } } },
+      orderBy: { createdAt: 'desc' },
       take: 60,
     }),
   ])
@@ -52,6 +58,19 @@ export default async function TransaksiPage() {
       lossLiters: s.lossLiters !== null ? Number(s.lossLiters) : null,
       note: s.note,
       at: s.soldAt.toISOString(),
+    })),
+    ...readings.map((r) => ({
+      id: r.id,
+      direction: 'STOK' as const,
+      productName: r.fuelProduct.name,
+      liters: null,
+      price: null,
+      total: null,
+      shift: r.shift,
+      actualStock: Number(r.actualLiters),
+      lossLiters: Number(r.lossLiters),
+      note: r.type === 'OPENING' ? `Stok Sekarang (Buka)${r.note ? ' — ' + r.note : ''}` : `Stok Sekarang (Tutup)${r.note ? ' — ' + r.note : ''}`,
+      at: r.createdAt.toISOString(),
     })),
   ]
     .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
