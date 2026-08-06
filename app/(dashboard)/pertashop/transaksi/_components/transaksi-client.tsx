@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { formatRupiah, formatDateTime } from '@/lib/utils'
@@ -21,7 +21,6 @@ type LogEntry = {
   at: string
 }
 type ExpenseDraft = { amount: number; description: string }
-type ReportedPreview = { reportedSales: number; totalLiters: number; saleCount: number; totalExpenses: number; netExpected: number }
 
 const RESET_CONFIRM_PHRASE = 'RESET PERTASHOP'
 const SHIFT_OPTIONS = ['Shift 1', 'Shift 2', 'Longshift']
@@ -71,30 +70,6 @@ export function TransaksiClient({
   const [expDesc, setExpDesc] = useState('')
   const expenseTotal = expenses.reduce((s, e) => s + e.amount, 0)
 
-  // Tabel kalkulasi — apa yang sudah tersimpan di sistem untuk tanggal & shift ini
-  const [reported, setReported] = useState<ReportedPreview | null>(null)
-
-  useEffect(() => {
-    if (!shift) {
-      setReported(null)
-      return
-    }
-    let cancelled = false
-    fetch(`/api/pertashop/rekonsiliasi?date=${date}&shift=${encodeURIComponent(shift)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (!cancelled && d) setReported(d)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [date, shift])
-
-  const netExpectedWithDraft = reported !== null ? reported.reportedSales - (reported.totalExpenses + expenseTotal) : null
-  const depositDiff =
-    netExpectedWithDraft !== null && depositAmount !== '' ? parseFloat(depositAmount) - netExpectedWithDraft : null
-
   const selectedProduct = products.find((p) => p.id === productId) ?? null
 
   function applyDefaultPrice(dir: 'IN' | 'OUT', prod: ProductLite | null) {
@@ -123,6 +98,10 @@ export function TransaksiClient({
   const selisih = actualNum !== null ? expectedStock - actualNum : null
   const total = litersNum * (parseFloat(price) || 0)
 
+  // Laporan ini sekaligus laporan setoran: setoran seharusnya = transaksi hari ini − biaya pengeluaran
+  const setoranSeharusnya = total - expenseTotal
+  const depositDiff = depositAmount !== '' ? parseFloat(depositAmount) - setoranSeharusnya : null
+
   function handleAddExpense() {
     const amt = parseFloat(expAmount)
     if (!amt || amt <= 0 || !expDesc.trim()) return
@@ -142,6 +121,7 @@ export function TransaksiClient({
     if (!shift) return setError('Pilih shift')
     if (actualStock === '') return setError('Stok sekarang (hasil ukur tangki) wajib diisi')
     if (direction !== 'STOK' && (!liters || litersNum <= 0)) return setError('Jumlah liter harus lebih dari 0')
+    if (depositAmount === '') return setError('Setoran uang wajib diisi')
 
     setLoading(true)
     try {
@@ -153,7 +133,7 @@ export function TransaksiClient({
         employeeId: employeeId || null,
         actualStock: actualNum,
         expenses,
-        depositAmount: depositAmount === '' ? null : parseFloat(depositAmount),
+        depositAmount: parseFloat(depositAmount),
         note: note || null,
       }
       if (direction === 'STOK') {
@@ -426,13 +406,6 @@ export function TransaksiClient({
               )}
             </div>
 
-            {direction !== 'STOK' && (
-              <div className="flex items-center justify-between pt-1 pb-1 border-b border-gray-50">
-                <span className="text-xs text-gray-500">Total Transaksi</span>
-                <span className="font-bold text-gray-900">{formatRupiah(total)}</span>
-              </div>
-            )}
-
             {/* Biaya Pengeluaran */}
             <div className="rounded-lg border border-amber-100 bg-amber-50/40 p-3 space-y-2">
               <p className="text-xs font-semibold text-amber-800">Biaya Pengeluaran</p>
@@ -484,39 +457,28 @@ export function TransaksiClient({
               />
             </div>
 
-            {/* Tabel kalkulasi */}
+            {/* Tabel kalkulasi — laporan jualan sekaligus laporan setoran hari ini */}
             <div className="rounded-lg bg-gray-50 p-3 space-y-1 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-500 text-xs">Laporan jualan {shift ? `(${shift})` : 'tanggal ini'}</span>
-                <span className="font-semibold text-gray-900">
-                  {!shift ? '— pilih shift' : reported === null ? '…' : formatRupiah(reported.reportedSales)}
-                </span>
+                <span className="text-gray-500 text-xs">Laporan jualan hari ini</span>
+                <span className="font-semibold text-gray-900">{formatRupiah(total)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500 text-xs">Biaya pengeluaran (tercatat + draf ini)</span>
-                <span className="font-semibold text-red-600">
-                  {!shift || reported === null ? '…' : `−${formatRupiah(reported.totalExpenses + expenseTotal)}`}
-                </span>
+                <span className="text-gray-500 text-xs">Biaya pengeluaran</span>
+                <span className="font-semibold text-red-600">−{formatRupiah(expenseTotal)}</span>
               </div>
               <div className="flex justify-between border-t border-gray-200 pt-1">
                 <span className="text-gray-600 text-xs font-medium">Setoran seharusnya</span>
-                <span className="font-bold text-gray-900">
-                  {!shift || netExpectedWithDraft === null ? '…' : formatRupiah(netExpectedWithDraft)}
-                </span>
+                <span className="font-bold text-gray-900">{formatRupiah(setoranSeharusnya)}</span>
               </div>
-              {reported !== null && (
-                <p className="text-xs text-gray-400">
-                  {reported.saleCount} transaksi tercatat · {reported.totalLiters.toLocaleString('id-ID', { maximumFractionDigits: 2 })} liter
-                </p>
-              )}
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Setoran Uang (Rp)</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Setoran Uang (Rp) *</label>
               <input
-                type="number" step="1" min="0" value={depositAmount}
+                type="number" step="1" min="0" required value={depositAmount}
                 onChange={(e) => setDepositAmount(e.target.value)}
-                placeholder="mis. 1250000 (opsional, isi saat tutup shift)"
+                placeholder="mis. 1250000"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
               {depositDiff !== null && !isNaN(depositDiff) && (
