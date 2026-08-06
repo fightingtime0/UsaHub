@@ -10,7 +10,7 @@ export default async function TransaksiPage() {
   const unit = await prisma.businessUnit.findFirst({ where: { type: 'PERTASHOP', isActive: true } })
   if (!unit) return <p className="text-red-500">Unit Pertashop tidak ditemukan.</p>
 
-  const [products, purchases, sales, readings] = await Promise.all([
+  const [products, purchases, sales, readings, employees, currentEmployee] = await Promise.all([
     prisma.fuelProduct.findMany({ where: { unitId: unit.id, isActive: true }, orderBy: { name: 'asc' } }),
     prisma.fuelPurchase.findMany({
       where: { unitId: unit.id },
@@ -30,6 +30,8 @@ export default async function TransaksiPage() {
       orderBy: { createdAt: 'desc' },
       take: 60,
     }),
+    prisma.employee.findMany({ where: { primaryUnitId: unit.id, isActive: true }, orderBy: { name: 'asc' } }),
+    prisma.employee.findUnique({ where: { userId: session.user.id } }),
   ])
 
   const log = [
@@ -87,6 +89,8 @@ export default async function TransaksiPage() {
         sellPrice: Number(p.sellPrice),
       }))}
       log={log}
+      employees={employees.map((e) => ({ id: e.id, name: e.name }))}
+      currentEmployeeId={currentEmployee?.id ?? null}
     />
   )
 }

@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { formatRupiah, formatDateTime } from '@/lib/utils'
-import { PengeluaranSetoranPanel } from '../../_components/pengeluaran-setoran-panel'
 
 type ProductLite = { id: string; name: string; stock: number; buyPrice: number; sellPrice: number }
+type EmployeeLite = { id: string; name: string }
 type LogEntry = {
   id: string
   direction: 'IN' | 'OUT' | 'STOK'
@@ -20,8 +20,11 @@ type LogEntry = {
   note: string | null
   at: string
 }
+type ExpenseDraft = { amount: number; description: string }
+type ReportedPreview = { reportedSales: number; totalLiters: number; saleCount: number; totalExpenses: number; netExpected: number }
 
 const RESET_CONFIRM_PHRASE = 'RESET PERTASHOP'
+const SHIFT_OPTIONS = ['Shift 1', 'Shift 2', 'Longshift']
 
 function todayStr() {
   const d = new Date()
@@ -30,24 +33,67 @@ function todayStr() {
   return `${d.getFullYear()}-${m}-${day}`
 }
 
-export function TransaksiClient({ products, log, role }: { products: ProductLite[]; log: LogEntry[]; role: string }) {
+export function TransaksiClient({
+  products,
+  log,
+  role,
+  employees,
+  currentEmployeeId,
+}: {
+  products: ProductLite[]
+  log: LogEntry[]
+  role: string
+  employees: EmployeeLite[]
+  currentEmployeeId: string | null
+}) {
   const router = useRouter()
   const canManageProduct = ['OWNER', 'MANAGER'].includes(role)
   const isOwner = role === 'OWNER'
 
-  // ── Form transaksi (masuk/keluar/stok sekarang) ────────────
+  // ── Laporan Shift — satu form, satu kali simpan ────────────
   const [loading, setLoading] = useState(false)
+  const [shift, setShift] = useState('')
+  const [employeeId, setEmployeeId] = useState(currentEmployeeId ?? '')
   const [direction, setDirection] = useState<'IN' | 'OUT' | 'STOK'>('IN')
   const [productId, setProductId] = useState(products[0]?.id ?? '')
   const [liters, setLiters] = useState('')
   const [price, setPrice] = useState(products[0] ? String(products[0].buyPrice) : '')
   const [actualStock, setActualStock] = useState('')
-  const [doSize, setDoSize] = useState('')
   const [readingType, setReadingType] = useState<'OPENING' | 'CLOSING'>('OPENING')
-  const [readingDate, setReadingDate] = useState(todayStr())
-  const [shift, setShift] = useState('')
+  const [date, setDate] = useState(todayStr())
+  const [depositAmount, setDepositAmount] = useState('')
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
+
+  // Biaya pengeluaran — dikumpulkan lokal dulu, baru ikut tersimpan saat "Simpan Laporan"
+  const [expenses, setExpenses] = useState<ExpenseDraft[]>([])
+  const [expAmount, setExpAmount] = useState('')
+  const [expDesc, setExpDesc] = useState('')
+  const expenseTotal = expenses.reduce((s, e) => s + e.amount, 0)
+
+  // Tabel kalkulasi — apa yang sudah tersimpan di sistem untuk tanggal & shift ini
+  const [reported, setReported] = useState<ReportedPreview | null>(null)
+
+  useEffect(() => {
+    if (!shift) {
+      setReported(null)
+      return
+    }
+    let cancelled = false
+    fetch(`/api/pertashop/rekonsiliasi?date=${date}&shift=${encodeURIComponent(shift)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d) setReported(d)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [date, shift])
+
+  const netExpectedWithDraft = reported !== null ? reported.reportedSales - (reported.totalExpenses + expenseTotal) : null
+  const depositDiff =
+    netExpectedWithDraft !== null && depositAmount !== '' ? parseFloat(depositAmount) - netExpectedWithDraft : null
 
   const selectedProduct = products.find((p) => p.id === productId) ?? null
 
@@ -77,36 +123,62 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
   const selisih = actualNum !== null ? expectedStock - actualNum : null
   const total = litersNum * (parseFloat(price) || 0)
 
+  function handleAddExpense() {
+    const amt = parseFloat(expAmount)
+    if (!amt || amt <= 0 || !expDesc.trim()) return
+    setExpenses((prev) => [...prev, { amount: amt, description: expDesc.trim() }])
+    setExpAmount('')
+    setExpDesc('')
+  }
+
+  function handleRemoveExpense(idx: number) {
+    setExpenses((prev) => prev.filter((_, i) => i !== idx))
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     if (!productId) return setError('Pilih produk BBM')
+    if (!shift) return setError('Pilih shift')
     if (actualStock === '') return setError('Stok sekarang (hasil ukur tangki) wajib diisi')
+    if (direction !== 'STOK' && (!liters || litersNum <= 0)) return setError('Jumlah liter harus lebih dari 0')
 
     setLoading(true)
     try {
-      const url =
-        direction === 'IN' ? '/api/pertashop/belanja' : direction === 'OUT' ? '/api/pertashop/penjualan' : '/api/pertashop/stok'
-      const payload =
-        direction === 'IN'
-          ? { fuelProductId: productId, liters: litersNum, buyPrice: parseFloat(price), doSize: doSize || null, actualStock: actualNum, shift: shift || null, note: note || null }
-          : direction === 'OUT'
-            ? { fuelProductId: productId, liters: litersNum, sellPrice: parseFloat(price), actualStock: actualNum, shift: shift || null, note: note || null }
-            : { fuelProductId: productId, type: readingType, date: readingDate, actualLiters: actualNum, shift: shift || null, note: note || null }
+      const payload: Record<string, unknown> = {
+        fuelProductId: productId,
+        direction,
+        date,
+        shift,
+        employeeId: employeeId || null,
+        actualStock: actualNum,
+        expenses,
+        depositAmount: depositAmount === '' ? null : parseFloat(depositAmount),
+        note: note || null,
+      }
+      if (direction === 'STOK') {
+        payload.readingType = readingType
+      } else {
+        payload.liters = litersNum
+        payload.price = parseFloat(price)
+      }
 
-      const res = await fetch(url, {
+      const res = await fetch('/api/pertashop/shift-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? 'Gagal menyimpan transaksi')
+        setError(data.error ?? 'Gagal menyimpan laporan')
         return
       }
       setLiters('')
       setActualStock('')
-      setDoSize('')
+      setExpenses([])
+      setExpAmount('')
+      setExpDesc('')
+      setDepositAmount('')
       setNote('')
       router.refresh()
     } finally {
@@ -122,10 +194,11 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
   const [editingId, setEditingId] = useState<string | null>(null)
   const [epBuy, setEpBuy] = useState('')
   const [epSell, setEpSell] = useState('')
+  const [productLoading, setProductLoading] = useState(false)
 
   async function handleNewProduct(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true)
+    setProductLoading(true)
     try {
       const res = await fetch('/api/pertashop/produk', {
         method: 'POST',
@@ -140,7 +213,7 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
       setNpName(''); setNpBuy(''); setNpSell(''); setShowNewProduct(false)
       router.refresh()
     } finally {
-      setLoading(false)
+      setProductLoading(false)
     }
   }
 
@@ -153,7 +226,7 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
   async function handleEditProduct(e: React.FormEvent) {
     e.preventDefault()
     if (!editingId) return
-    setLoading(true)
+    setProductLoading(true)
     try {
       const res = await fetch('/api/pertashop/produk', {
         method: 'PATCH',
@@ -168,13 +241,13 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
       setEditingId(null)
       router.refresh()
     } finally {
-      setLoading(false)
+      setProductLoading(false)
     }
   }
 
   async function handleDeactivateProduct(p: ProductLite) {
     if (!confirm(`Nonaktifkan produk ${p.name}? Produk tidak akan muncul lagi di form transaksi.`)) return
-    setLoading(true)
+    setProductLoading(true)
     try {
       const res = await fetch('/api/pertashop/produk', {
         method: 'PATCH',
@@ -188,7 +261,7 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
       }
       router.refresh()
     } finally {
-      setLoading(false)
+      setProductLoading(false)
     }
   }
 
@@ -224,8 +297,8 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
           </svg>
         </Link>
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Input Transaksi BBM</h1>
-          <p className="text-xs md:text-sm text-gray-500">Catat stok masuk & penjualan, sekaligus pantau penguapan/susut tiap transaksi</p>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Laporan Shift Pertashop</h1>
+          <p className="text-xs md:text-sm text-gray-500">Satu form: transaksi, biaya pengeluaran, dan setoran — simpan sekali jalan</p>
         </div>
       </div>
 
@@ -233,6 +306,33 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
         {/* Form + kelola produk */}
         <div className="space-y-4">
           <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 md:p-5 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Shift *</label>
+                <select
+                  value={shift} onChange={(e) => setShift(e.target.value)} required
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="">— pilih shift —</option>
+                  {SHIFT_OPTIONS.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Karyawan</label>
+                <select
+                  value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="">— tidak diisi —</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>{emp.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button" onClick={() => onDirectionChange('IN')}
@@ -260,12 +360,6 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
               </button>
             </div>
 
-            {direction === 'STOK' && (
-              <p className="text-xs text-gray-400 -mt-1">
-                Lapor hasil ukur tangki tanpa transaksi belanja/jual — biasanya dipakai shift 1 (buka) untuk laporan stok awal.
-              </p>
-            )}
-
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Produk BBM</label>
               <select
@@ -282,25 +376,15 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
             </div>
 
             {direction === 'STOK' ? (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Tanggal</label>
-                  <input
-                    type="date" required value={readingDate}
-                    onChange={(e) => setReadingDate(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Jenis</label>
-                  <select
-                    value={readingType} onChange={(e) => setReadingType(e.target.value as 'OPENING' | 'CLOSING')}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  >
-                    <option value="OPENING">Buka (awal shift)</option>
-                    <option value="CLOSING">Tutup (akhir shift)</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Jenis</label>
+                <select
+                  value={readingType} onChange={(e) => setReadingType(e.target.value as 'OPENING' | 'CLOSING')}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="OPENING">Buka (awal shift)</option>
+                  <option value="CLOSING">Tutup (akhir shift)</option>
+                </select>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3">
@@ -323,23 +407,6 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
               </div>
             )}
 
-            {direction === 'IN' && (
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Ukuran DO (opsional)</label>
-                <input
-                  type="text" list="do-size-options" value={doSize} onChange={(e) => setDoSize(e.target.value)}
-                  placeholder="mis. 2K, 3K, 5K"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-                <datalist id="do-size-options">
-                  <option value="2K" />
-                  <option value="3K" />
-                  <option value="5K" />
-                  <option value="8K" />
-                </datalist>
-              </div>
-            )}
-
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Stok Sekarang (hasil ukur tangki) *</label>
               <input
@@ -359,22 +426,114 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
               )}
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Shift</label>
+            {direction !== 'STOK' && (
+              <div className="flex items-center justify-between pt-1 pb-1 border-b border-gray-50">
+                <span className="text-xs text-gray-500">Total Transaksi</span>
+                <span className="font-bold text-gray-900">{formatRupiah(total)}</span>
+              </div>
+            )}
+
+            {/* Biaya Pengeluaran */}
+            <div className="rounded-lg border border-amber-100 bg-amber-50/40 p-3 space-y-2">
+              <p className="text-xs font-semibold text-amber-800">Biaya Pengeluaran</p>
+              <div className="grid grid-cols-[1fr_auto] gap-2">
+                <input
+                  type="number" step="1" min="1" value={expAmount} onChange={(e) => setExpAmount(e.target.value)}
+                  placeholder="Jumlah (Rp)"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+                <button
+                  type="button" onClick={handleAddExpense}
+                  className="px-3 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition-colors"
+                >
+                  Tambah
+                </button>
+              </div>
               <input
-                type="text" list="shift-options" value={shift} onChange={(e) => setShift(e.target.value)}
-                placeholder="mis. Pagi, Siang, Malam"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                type="text" value={expDesc} onChange={(e) => setExpDesc(e.target.value)}
+                placeholder="Keterangan (mis. beli oli mesin)"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
-              <datalist id="shift-options">
-                <option value="Pagi" />
-                <option value="Siang" />
-                <option value="Malam" />
-              </datalist>
+              {expenses.length > 0 && (
+                <div className="divide-y divide-amber-100 -mx-1">
+                  {expenses.map((ex, i) => (
+                    <div key={i} className="px-1 py-1.5 flex items-center justify-between gap-2 text-sm">
+                      <span className="text-gray-700 truncate">{ex.description}</span>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="font-medium text-red-600">−{formatRupiah(ex.amount)}</span>
+                        <button type="button" onClick={() => handleRemoveExpense(i)} className="text-gray-400 hover:text-red-500 text-xs" aria-label="Hapus">
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center justify-between text-sm font-semibold pt-1.5 border-t border-amber-100">
+                <span className="text-amber-800 text-xs">Total Biaya Pengeluaran</span>
+                <span className="text-red-600">{formatRupiah(expenseTotal)}</span>
+              </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Catatan / Berita Acara</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Tanggal</label>
+              <input
+                type="date" required value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            {/* Tabel kalkulasi */}
+            <div className="rounded-lg bg-gray-50 p-3 space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500 text-xs">Laporan jualan {shift ? `(${shift})` : 'tanggal ini'}</span>
+                <span className="font-semibold text-gray-900">
+                  {!shift ? '— pilih shift' : reported === null ? '…' : formatRupiah(reported.reportedSales)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500 text-xs">Biaya pengeluaran (tercatat + draf ini)</span>
+                <span className="font-semibold text-red-600">
+                  {!shift || reported === null ? '…' : `−${formatRupiah(reported.totalExpenses + expenseTotal)}`}
+                </span>
+              </div>
+              <div className="flex justify-between border-t border-gray-200 pt-1">
+                <span className="text-gray-600 text-xs font-medium">Setoran seharusnya</span>
+                <span className="font-bold text-gray-900">
+                  {!shift || netExpectedWithDraft === null ? '…' : formatRupiah(netExpectedWithDraft)}
+                </span>
+              </div>
+              {reported !== null && (
+                <p className="text-xs text-gray-400">
+                  {reported.saleCount} transaksi tercatat · {reported.totalLiters.toLocaleString('id-ID', { maximumFractionDigits: 2 })} liter
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Setoran Uang (Rp)</label>
+              <input
+                type="number" step="1" min="0" value={depositAmount}
+                onChange={(e) => setDepositAmount(e.target.value)}
+                placeholder="mis. 1250000 (opsional, isi saat tutup shift)"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              {depositDiff !== null && !isNaN(depositDiff) && (
+                <p className={`text-xs mt-1 font-medium ${
+                  depositDiff === 0 ? 'text-emerald-600' : depositDiff > 0 ? 'text-blue-600' : 'text-red-600'
+                }`}>
+                  {depositDiff === 0
+                    ? '✓ Setoran cocok dengan laporan'
+                    : depositDiff > 0
+                      ? `Setoran lebih ${formatRupiah(depositDiff)}`
+                      : `Setoran kurang ${formatRupiah(Math.abs(depositDiff))}`}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Berita Acara</label>
               <textarea
                 value={note} onChange={(e) => setNote(e.target.value)} rows={3}
                 placeholder="mis. serah terima shift, kondisi tangki, dll"
@@ -382,22 +541,13 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
               />
             </div>
 
-            {direction !== 'STOK' && (
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-xs text-gray-500">Total</span>
-                <span className="font-bold text-gray-900">{formatRupiah(total)}</span>
-              </div>
-            )}
-
             {error && <p className="text-sm text-red-600">{error}</p>}
 
             <button
               type="submit" disabled={loading || !productId}
-              className={`w-full text-white rounded-lg py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 ${
-                direction === 'IN' ? 'bg-emerald-600 hover:bg-emerald-700' : direction === 'OUT' ? 'bg-sky-600 hover:bg-sky-700' : 'bg-amber-500 hover:bg-amber-600'
-              }`}
+              className="w-full text-white rounded-lg py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 bg-emerald-600 hover:bg-emerald-700"
             >
-              {loading ? 'Menyimpan...' : direction === 'IN' ? 'Simpan Stok Masuk' : direction === 'OUT' ? 'Simpan Penjualan' : 'Simpan Laporan Stok'}
+              {loading ? 'Menyimpan...' : 'Simpan Laporan'}
             </button>
           </form>
 
@@ -430,7 +580,7 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
                     />
                   </div>
                   <button
-                    type="submit" disabled={loading}
+                    type="submit" disabled={productLoading}
                     className="w-full border border-emerald-600 text-emerald-700 rounded-lg py-2 text-sm font-semibold hover:bg-emerald-50 transition-colors disabled:opacity-50"
                   >
                     Tambah Produk
@@ -471,7 +621,7 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
                             className="flex-1 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-600 hover:bg-gray-50">
                             Batal
                           </button>
-                          <button type="submit" disabled={loading}
+                          <button type="submit" disabled={productLoading}
                             className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold">
                             Simpan
                           </button>
@@ -554,23 +704,6 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
               </tbody>
             </table>
           </div>
-        </div>
-      </div>
-
-      {/* Biaya pengeluaran + setoran — dicatat langsung saat input, sama seperti di halaman Rekonsiliasi */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="self-start">
-          <PengeluaranSetoranPanel />
-        </div>
-        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-4 md:p-5 self-start">
-          <h2 className="font-semibold text-gray-900 text-sm md:text-base mb-1">Riwayat Rekonsiliasi</h2>
-          <p className="text-xs text-gray-500 mb-3">Lihat rekap setoran harian lengkap, termasuk selisih vs laporan jualan.</p>
-          <Link
-            href="/pertashop/rekonsiliasi"
-            className="inline-flex items-center gap-1.5 text-sm text-emerald-700 hover:underline font-medium"
-          >
-            Buka Riwayat Rekonsiliasi →
-          </Link>
         </div>
       </div>
 
