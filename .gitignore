@@ -13,3 +13,7 @@ tsconfig.tsbuildinfo
 
 # Was only added as a manual trigger to un-stick a stalled Vercel deploy webhook
 /README.md
+
+# AI agent tooling config (dev-server launch config for browser preview, etc.) — local to each
+# agent session, not part of the app
+/.claude/

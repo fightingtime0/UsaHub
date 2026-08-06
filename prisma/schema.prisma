@@ -189,6 +189,8 @@ model BusinessUnit {
   fuelStockReadings   FuelStockReading[]
   fuelReconciliations FuelReconciliation[]
   fuelExpenses        FuelExpense[]
+  fuelSettings        FuelSettings?
+  fuelPayrollExpenses FuelPayrollExpense[]
   groupOrders         GroupOrder[]
 
   @@map("business_units")
@@ -689,6 +691,7 @@ model FuelPurchase {
   liters         Decimal  @db.Decimal(12, 3)
   buyPrice       Decimal  @db.Decimal(12, 2) // per liter
   total          Decimal  @db.Decimal(14, 2) // liters * buyPrice
+  doSize         String? // ukuran tangki pengiriman (DO), mis. "2K", "3K", "5K"
   shift          String?
   expectedStock  Decimal? @db.Decimal(12, 3) // stok sistem sebelum dikoreksi ke hasil ukur
   actualStock    Decimal? @db.Decimal(12, 3) // hasil ukur tangki operator setelah transaksi ini
@@ -793,6 +796,39 @@ model FuelExpense {
 
   @@index([unitId, date])
   @@map("fuel_expenses")
+}
+
+// Pengaturan investasi Pertashop (satu baris per unit) — dipakai untuk hitung
+// depresiasi & sewa lahan di Laporan Laba/Rugi. Depresiasi/tahun = investmentAmount / usefulLifeYears.
+model FuelSettings {
+  id                   String    @id @default(cuid())
+  investmentAmount     Decimal   @default(0) @db.Decimal(14, 2) // Investasi Modal
+  usefulLifeYears      Int       @default(5) // masa manfaat aset (tahun), untuk hitung depresiasi
+  landRentPerMonth     Decimal   @default(0) @db.Decimal(14, 2) // Sewa lahan per bulan
+  operationalStartDate DateTime? @db.Date // Mulai Operasional
+  updatedAt            DateTime  @updatedAt
+
+  unitId String       @unique
+  unit   BusinessUnit @relation(fields: [unitId], references: [id])
+
+  @@map("fuel_settings")
+}
+
+// Biaya Gaji bulanan Pertashop — diinput manual tiap bulan (beda-beda karena lembur/bonus/potongan),
+// dipakai di Laporan Laba/Rugi. Satu baris per unit per bulan (upsert).
+model FuelPayrollExpense {
+  id        String   @id @default(cuid())
+  month     DateTime @db.Date // disimpan sebagai tanggal 1 pada bulan tsb
+  amount    Decimal  @db.Decimal(14, 2)
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  unitId String
+  unit   BusinessUnit @relation(fields: [unitId], references: [id])
+
+  @@unique([unitId, month])
+  @@map("fuel_payroll_expenses")
 }
 
 // ============================================================

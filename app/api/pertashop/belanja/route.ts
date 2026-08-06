@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   if (!hasUnitAccess(session, 'PERTASHOP')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
-  const { fuelProductId, liters, buyPrice, actualStock, shift, note, purchasedAt } = body
+  const { fuelProductId, liters, buyPrice, doSize, actualStock, shift, note, purchasedAt } = body
 
   if (!fuelProductId || !liters || !buyPrice) {
     return NextResponse.json({ error: 'Produk, liter, dan harga beli wajib diisi' }, { status: 400 })
@@ -64,6 +64,7 @@ export async function POST(req: NextRequest) {
         liters: litersNum,
         buyPrice: Number(buyPrice),
         total,
+        doSize: doSize || null,
         shift: shift || null,
         expectedStock,
         actualStock: actual,

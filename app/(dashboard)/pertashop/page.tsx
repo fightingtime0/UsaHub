@@ -198,6 +198,9 @@ export default async function PertashopPage() {
             {[
               { label: 'Input Transaksi', href: '/pertashop/transaksi', icon: 'M12 4v16m8-8H4' },
               { label: 'Rekonsiliasi', href: '/pertashop/rekonsiliasi', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+              ...(session.user.role === 'OWNER' || session.user.role === 'MANAGER'
+                ? [{ label: 'Laporan Laba/Rugi', href: '/pertashop/laporan', icon: 'M9 19v-6a2 2 0 012-2h2a2 2 0 012 2v6m-9 0h10a2 2 0 002-2V7a2 2 0 00-2-2h-3l-2-2H8a2 2 0 00-2 2v13a2 2 0 002 2z' }]
+                : []),
             ].map((nav) => (
               <Link
                 key={nav.href}

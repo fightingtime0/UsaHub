@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { formatRupiah, formatDateTime } from '@/lib/utils'
+import { PengeluaranSetoranPanel } from '../../_components/pengeluaran-setoran-panel'
 
 type ProductLite = { id: string; name: string; stock: number; buyPrice: number; sellPrice: number }
 type LogEntry = {
@@ -41,6 +42,7 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
   const [liters, setLiters] = useState('')
   const [price, setPrice] = useState(products[0] ? String(products[0].buyPrice) : '')
   const [actualStock, setActualStock] = useState('')
+  const [doSize, setDoSize] = useState('')
   const [readingType, setReadingType] = useState<'OPENING' | 'CLOSING'>('OPENING')
   const [readingDate, setReadingDate] = useState(todayStr())
   const [shift, setShift] = useState('')
@@ -87,7 +89,7 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
         direction === 'IN' ? '/api/pertashop/belanja' : direction === 'OUT' ? '/api/pertashop/penjualan' : '/api/pertashop/stok'
       const payload =
         direction === 'IN'
-          ? { fuelProductId: productId, liters: litersNum, buyPrice: parseFloat(price), actualStock: actualNum, shift: shift || null, note: note || null }
+          ? { fuelProductId: productId, liters: litersNum, buyPrice: parseFloat(price), doSize: doSize || null, actualStock: actualNum, shift: shift || null, note: note || null }
           : direction === 'OUT'
             ? { fuelProductId: productId, liters: litersNum, sellPrice: parseFloat(price), actualStock: actualNum, shift: shift || null, note: note || null }
             : { fuelProductId: productId, type: readingType, date: readingDate, actualLiters: actualNum, shift: shift || null, note: note || null }
@@ -104,6 +106,7 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
       }
       setLiters('')
       setActualStock('')
+      setDoSize('')
       setNote('')
       router.refresh()
     } finally {
@@ -317,6 +320,23 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
+              </div>
+            )}
+
+            {direction === 'IN' && (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Ukuran DO (opsional)</label>
+                <input
+                  type="text" list="do-size-options" value={doSize} onChange={(e) => setDoSize(e.target.value)}
+                  placeholder="mis. 2K, 3K, 5K"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <datalist id="do-size-options">
+                  <option value="2K" />
+                  <option value="3K" />
+                  <option value="5K" />
+                  <option value="8K" />
+                </datalist>
               </div>
             )}
 
@@ -534,6 +554,23 @@ export function TransaksiClient({ products, log, role }: { products: ProductLite
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      {/* Biaya pengeluaran + setoran — dicatat langsung saat input, sama seperti di halaman Rekonsiliasi */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="self-start">
+          <PengeluaranSetoranPanel />
+        </div>
+        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-4 md:p-5 self-start">
+          <h2 className="font-semibold text-gray-900 text-sm md:text-base mb-1">Riwayat Rekonsiliasi</h2>
+          <p className="text-xs text-gray-500 mb-3">Lihat rekap setoran harian lengkap, termasuk selisih vs laporan jualan.</p>
+          <Link
+            href="/pertashop/rekonsiliasi"
+            className="inline-flex items-center gap-1.5 text-sm text-emerald-700 hover:underline font-medium"
+          >
+            Buka Riwayat Rekonsiliasi →
+          </Link>
         </div>
       </div>
 
