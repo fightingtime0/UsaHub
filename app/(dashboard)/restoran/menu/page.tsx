@@ -1,13 +1,14 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 import { MenuClient } from './_components/menu-client'
 
 export default async function MenuPage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'RESTAURANT', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'RESTAURANT')
   if (!unit) return <p>Unit tidak ditemukan.</p>
 
   const [menuItems, categories, products] = await Promise.all([

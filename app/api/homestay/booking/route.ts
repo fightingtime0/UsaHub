@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getSession } from '@/lib/auth'
 import { createBooking, serializeBooking } from '@/lib/accommodation'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 
 export async function GET(req: NextRequest) {
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'HOMESTAY', isActive: true } })
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const unit = await getTenantUnit(session.user.tenantId!, 'HOMESTAY')
   if (!unit) return NextResponse.json({ error: 'Unit tidak ditemukan' }, { status: 404 })
 
   const { searchParams } = req.nextUrl
@@ -38,12 +41,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
+  const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
     const body = await req.json()
-    const { booking, breakdown } = await createBooking('HOMESTAY', body)
+    const { booking, breakdown } = await createBooking(session.user.tenantId!, 'HOMESTAY', body)
     return NextResponse.json({ booking: serializeBooking(booking), breakdown }, { status: 201 })
   } catch (err: any) {
     const status = err.message.includes('konflik') || err.message.includes('aktif') ? 409 : 400

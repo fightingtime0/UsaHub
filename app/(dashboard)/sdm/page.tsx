@@ -10,7 +10,7 @@ export default async function SdmPage() {
 
   const [employees, units] = await Promise.all([
     prisma.employee.findMany({
-      where: { isActive: true },
+      where: { isActive: true, primaryUnit: { tenantId: session.user.tenantId } },
       include: {
         primaryUnit: { select: { id: true, name: true, type: true } },
         user: { select: { email: true, role: true } },
@@ -18,7 +18,7 @@ export default async function SdmPage() {
       orderBy: [{ primaryUnit: { name: 'asc' } }, { name: 'asc' }],
     }),
     prisma.businessUnit.findMany({
-      where: { isActive: true },
+      where: { isActive: true, tenantId: session.user.tenantId },
       select: { id: true, name: true, type: true },
       orderBy: { name: 'asc' },
     }),

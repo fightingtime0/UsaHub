@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 
 // DELETE — reset seluruh riwayat transaksi Pertashop (masuk & keluar) dan kembalikan
 // stok tiap produk BBM ke 0. Destruktif & tidak bisa dibatalkan — khusus OWNER.
@@ -12,7 +13,7 @@ export async function DELETE() {
     return NextResponse.json({ error: 'Hanya Owner yang bisa mereset data Pertashop' }, { status: 403 })
   }
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'PERTASHOP', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'PERTASHOP')
   if (!unit) return NextResponse.json({ error: 'Unit Pertashop tidak ditemukan' }, { status: 404 })
 
   const result = await prisma.$transaction(async (tx) => {

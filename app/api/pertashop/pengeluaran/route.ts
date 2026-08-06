@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession, hasUnitAccess } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 import { startOfDay, endOfDay } from 'date-fns'
 
 // GET — riwayat biaya pengeluaran.
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasUnitAccess(session, 'PERTASHOP')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'PERTASHOP', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'PERTASHOP')
   if (!unit) return NextResponse.json({ error: 'Unit Pertashop tidak ditemukan' }, { status: 404 })
 
   const dateParam = req.nextUrl.searchParams.get('date')
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Jumlah harus lebih dari 0' }, { status: 400 })
   }
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'PERTASHOP', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'PERTASHOP')
   if (!unit) return NextResponse.json({ error: 'Unit Pertashop tidak ditemukan' }, { status: 404 })
 
   const expense = await prisma.fuelExpense.create({
@@ -67,7 +68,7 @@ export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'ID wajib diisi' }, { status: 400 })
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'PERTASHOP', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'PERTASHOP')
   if (!unit) return NextResponse.json({ error: 'Unit Pertashop tidak ditemukan' }, { status: 404 })
 
   const expense = await prisma.fuelExpense.findUnique({ where: { id } })

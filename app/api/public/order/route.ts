@@ -10,13 +10,17 @@ import { generateInvoiceNumber } from '@/lib/utils'
 const MAX_QTY_PER_ITEM = 20
 const MAX_ITEMS_PER_REQUEST = 20
 
-// GET ?table=N — order aktif meja tsb (untuk pengunjung melihat pesanannya)
+// GET ?unitId=...&table=N — order aktif meja tsb (untuk pengunjung melihat pesanannya)
 export async function GET(req: NextRequest) {
+  const unitId = req.nextUrl.searchParams.get('unitId')
   const table = req.nextUrl.searchParams.get('table')
+  if (!unitId) return NextResponse.json({ error: 'Parameter unitId diperlukan' }, { status: 400 })
   if (!table) return NextResponse.json({ error: 'Parameter table diperlukan' }, { status: 400 })
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'RESTAURANT', isActive: true } })
-  if (!unit) return NextResponse.json({ error: 'Restoran tidak ditemukan' }, { status: 404 })
+  const unit = await prisma.businessUnit.findUnique({ where: { id: unitId } })
+  if (!unit || unit.type !== 'RESTAURANT' || !unit.isActive) {
+    return NextResponse.json({ error: 'Restoran tidak ditemukan' }, { status: 404 })
+  }
 
   const order = await prisma.tableOrder.findFirst({
     where: { unitId: unit.id, tableNumber: table, status: { in: ['OPEN', 'BILLED'] } },
@@ -60,7 +64,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Body tidak valid' }, { status: 400 })
   }
 
-  const { tableNumber, items } = body
+  const { unitId, tableNumber, items } = body
+  if (!unitId) {
+    return NextResponse.json({ error: 'Parameter unitId diperlukan' }, { status: 400 })
+  }
   if (!tableNumber || !Array.isArray(items) || items.length === 0) {
     return NextResponse.json({ error: 'Nomor meja dan item pesanan wajib diisi' }, { status: 400 })
   }
@@ -68,8 +75,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Terlalu banyak item dalam satu pesanan' }, { status: 400 })
   }
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'RESTAURANT', isActive: true } })
-  if (!unit) return NextResponse.json({ error: 'Restoran tidak ditemukan' }, { status: 404 })
+  const unit = await prisma.businessUnit.findUnique({ where: { id: unitId } })
+  if (!unit || unit.type !== 'RESTAURANT' || !unit.isActive) {
+    return NextResponse.json({ error: 'Restoran tidak ditemukan' }, { status: 404 })
+  }
 
   // Validasi semua menu item
   const menuIds = items.map((i: any) => i.menuItemId)

@@ -1,6 +1,7 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 import { ProdukClient } from './_components/produk-client'
 
 export default async function ProdukPage({
@@ -11,7 +12,7 @@ export default async function ProdukPage({
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'RETAIL', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'RETAIL')
   if (!unit) return <p className="text-red-500">Unit tidak ditemukan.</p>
 
   const search = searchParams.search ?? ''

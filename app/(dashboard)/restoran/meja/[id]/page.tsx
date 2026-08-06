@@ -21,8 +21,10 @@ export default async function OrderMejaPage({ params }: { params: Promise<{ id: 
 
   const unit = await prisma.businessUnit.findUnique({
     where: { id: order.unitId },
-    select: { name: true, location: true, taxRate: true },
+    select: { name: true, location: true, taxRate: true, tenantId: true },
   })
+
+  if (!unit || unit.tenantId !== session.user.tenantId) redirect('/restoran')
 
   const menuItems = await prisma.menuItem.findMany({
     where: { unitId: order.unitId, isAvailable: true },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession, hasUnitAccess } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 import { startOfMonth } from 'date-fns'
 
 // GET — Biaya Gaji bulanan Pertashop (input manual). ?month=YYYY-MM wajib.
@@ -12,7 +13,7 @@ export async function GET(req: NextRequest) {
   const monthParam = req.nextUrl.searchParams.get('month')
   if (!monthParam) return NextResponse.json({ error: 'Parameter month wajib diisi' }, { status: 400 })
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'PERTASHOP', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'PERTASHOP')
   if (!unit) return NextResponse.json({ error: 'Unit Pertashop tidak ditemukan' }, { status: 404 })
 
   const month = startOfMonth(new Date(`${monthParam}-01`))
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Jumlah tidak boleh negatif' }, { status: 400 })
   }
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'PERTASHOP', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'PERTASHOP')
   if (!unit) return NextResponse.json({ error: 'Unit Pertashop tidak ditemukan' }, { status: 404 })
 
   const month = startOfMonth(new Date(`${monthParam}-01`))

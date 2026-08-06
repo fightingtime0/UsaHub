@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import QRCode from 'qrcode'
 
-export function QrPrintClient({ tableNumbers }: { tableNumbers: string[] }) {
+export function QrPrintClient({ tableNumbers, restaurantUnitId }: { tableNumbers: string[]; restaurantUnitId: string }) {
   const [qrCodes, setQrCodes] = useState<Record<string, string>>({})
   const [origin, setOrigin] = useState('')
 
@@ -13,12 +13,12 @@ export function QrPrintClient({ tableNumbers }: { tableNumbers: string[] }) {
     setOrigin(org)
     Promise.all(
       tableNumbers.map(async (t) => {
-        const url = `${org}/order/${encodeURIComponent(t)}`
+        const url = `${org}/order/${restaurantUnitId}/${encodeURIComponent(t)}`
         const dataUrl = await QRCode.toDataURL(url, { width: 400, margin: 2 })
         return [t, dataUrl] as const
       })
     ).then((entries) => setQrCodes(Object.fromEntries(entries)))
-  }, [tableNumbers])
+  }, [tableNumbers, restaurantUnitId])
 
   return (
     <div className="space-y-5">
@@ -61,7 +61,7 @@ export function QrPrintClient({ tableNumbers }: { tableNumbers: string[] }) {
               <div className="w-[180px] h-[180px] bg-gray-100 rounded-lg animate-pulse" />
             )}
             <p className="text-[10px] text-gray-400 mt-2 break-all">
-              {origin ? `${origin}/order/${t}` : '...'}
+              {origin ? `${origin}/order/${restaurantUnitId}/${t}` : '...'}
             </p>
             <p className="text-xs text-gray-500 mt-1 font-medium">Pembayaran di kasir</p>
           </div>

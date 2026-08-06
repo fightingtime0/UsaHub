@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 import { generateInvoiceNumber } from '@/lib/utils'
 
 export async function GET(req: NextRequest) {
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
   const status = searchParams.get('status') ?? undefined
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'RETAIL', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'RETAIL')
   if (!unit) return NextResponse.json({ error: 'Unit tidak ditemukan' }, { status: 404 })
 
   const orders = await prisma.purchaseOrder.findMany({
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Data tidak lengkap' }, { status: 400 })
   }
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'RETAIL', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'RETAIL')
   if (!unit) return NextResponse.json({ error: 'Unit tidak ditemukan' }, { status: 404 })
 
   const total = items.reduce((sum: number, i: any) => sum + i.price * i.qty, 0)

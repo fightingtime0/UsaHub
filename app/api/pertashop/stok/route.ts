@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession, hasUnitAccess } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 
 // GET — riwayat pengukuran stok (loss)
 export async function GET() {
@@ -8,7 +9,7 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasUnitAccess(session, 'PERTASHOP')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'PERTASHOP', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'PERTASHOP')
   if (!unit) return NextResponse.json({ error: 'Unit Pertashop tidak ditemukan' }, { status: 404 })
 
   const readings = await prisma.fuelStockReading.findMany({
@@ -45,8 +46,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Hasil ukur tidak boleh negatif' }, { status: 400 })
   }
 
-  const product = await prisma.fuelProduct.findUnique({ where: { id: fuelProductId } })
-  if (!product || !product.isActive) {
+  const product = await prisma.fuelProduct.findUnique({
+    where: { id: fuelProductId },
+    include: { unit: { select: { tenantId: true } } },
+  })
+  if (!product || !product.isActive || product.unit.tenantId !== session.user.tenantId) {
     return NextResponse.json({ error: 'Produk BBM tidak ditemukan' }, { status: 404 })
   }
 

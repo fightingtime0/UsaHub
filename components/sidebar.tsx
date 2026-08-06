@@ -92,7 +92,21 @@ const NAV_ITEMS: NavItem[] = [
   },
 ]
 
+const SUPERADMIN_NAV_ITEMS: NavItem[] = [
+  {
+    label: 'Tenant',
+    href: '/superadmin',
+    icon: <Icon d="M3 21h18M5 21V7l8-4v18M13 21V3l6 3v15M9 9v.01M9 12v.01M9 15v.01" />,
+  },
+  {
+    label: 'Akun Saya',
+    href: '/akun',
+    icon: <Icon d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />,
+  },
+]
+
 function filterNavItems(role: Role, unitType: string | null): NavItem[] {
+  if (role === 'SUPERADMIN') return SUPERADMIN_NAV_ITEMS
   return NAV_ITEMS.filter((item) => {
     const roleOk = !item.roles || item.roles.includes(role)
     if (!roleOk) return false
@@ -103,10 +117,11 @@ function filterNavItems(role: Role, unitType: string | null): NavItem[] {
 }
 
 const ROLE_LABEL: Record<Role, string> = {
-  OWNER:   'Owner',
-  MANAGER: 'Manager',
-  STAFF:   'Staff',
-  CASHIER: 'Kasir',
+  SUPERADMIN: 'Superadmin',
+  OWNER:      'Owner',
+  MANAGER:    'Manager',
+  STAFF:      'Staff',
+  CASHIER:    'Kasir',
 }
 
 type SidebarProps = {

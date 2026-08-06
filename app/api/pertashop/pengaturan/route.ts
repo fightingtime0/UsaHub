@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession, hasUnitAccess } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 
 // GET — pengaturan investasi Pertashop (Investasi Modal, masa manfaat, sewa lahan, mulai operasional).
 // Dipakai untuk hitung depresiasi & sewa lahan di Laporan Laba/Rugi.
@@ -9,7 +10,7 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasUnitAccess(session, 'PERTASHOP')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'PERTASHOP', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'PERTASHOP')
   if (!unit) return NextResponse.json({ error: 'Unit Pertashop tidak ditemukan' }, { status: 404 })
 
   const settings = await prisma.fuelSettings.findUnique({ where: { unitId: unit.id } })
@@ -46,7 +47,7 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'Masa manfaat harus lebih dari 0 tahun' }, { status: 400 })
   }
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'PERTASHOP', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'PERTASHOP')
   if (!unit) return NextResponse.json({ error: 'Unit Pertashop tidak ditemukan' }, { status: 404 })
 
   const data = {

@@ -19,10 +19,11 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
         },
       },
       payments: { orderBy: { paidAt: 'asc' } },
+      unit: { select: { tenantId: true } },
     },
   })
 
-  if (!booking) redirect('/penginapan')
+  if (!booking || booking.unit.tenantId !== session.user.tenantId) redirect('/penginapan')
 
   const breakdown = resolveNightlyPricing(
     booking.checkIn,

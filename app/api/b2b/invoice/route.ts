@@ -5,12 +5,18 @@ import { prisma } from '@/lib/prisma'
 import { generateInvoiceNumber, calculateTax, calculateTotal } from '@/lib/utils'
 
 export async function GET(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const { searchParams } = req.nextUrl
   const status = searchParams.get('status')
   const page   = parseInt(searchParams.get('page') ?? '1')
   const limit  = 25
 
-  const where = status ? { status: status as any } : {}
+  const where = {
+    ...(status ? { status: status as any } : {}),
+    sellerUnit: { tenantId: session.user.tenantId },
+  }
 
   const [invoices, total] = await Promise.all([
     prisma.b2BInvoice.findMany({
@@ -63,12 +69,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Minimal satu item' }, { status: 400 })
   }
 
-  const sellerUnit = await prisma.businessUnit.findUnique({ where: { id: sellerUnitId } })
+  const sellerUnit = await prisma.businessUnit.findFirst({ where: { id: sellerUnitId, tenantId: session.user.tenantId } })
   if (!sellerUnit) return NextResponse.json({ error: 'Unit penjual tidak ditemukan' }, { status: 404 })
 
-  // Validasi semua sellerProduct ada dan punya stok cukup
+  const buyerUnit = await prisma.businessUnit.findFirst({ where: { id: buyerUnitId, tenantId: session.user.tenantId } })
+  if (!buyerUnit) return NextResponse.json({ error: 'Unit pembeli tidak ditemukan' }, { status: 404 })
+
+  // Validasi semua sellerProduct ada, milik sellerUnit yang sama, dan punya stok cukup
   for (const item of items) {
-    const product = await prisma.product.findUnique({ where: { id: item.sellerProductId } })
+    const product = await prisma.product.findFirst({ where: { id: item.sellerProductId, unitId: sellerUnitId } })
     if (!product) return NextResponse.json({ error: `Produk ${item.sellerProductId} tidak ditemukan` }, { status: 400 })
     if (Number(product.stock) < item.qty) {
       return NextResponse.json({ error: `Stok ${product.name} tidak cukup (ada: ${product.stock}, diminta: ${item.qty})` }, { status: 400 })

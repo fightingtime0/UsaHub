@@ -34,10 +34,12 @@ const ITEM_STATUS_LABEL: Record<string, string> = {
 }
 
 export function QrOrderClient({
+  unitId,
   restaurantName,
   tableNumber,
   menuItems,
 }: {
+  unitId: string
   restaurantName: string
   tableNumber: string
   menuItems: MenuItemLite[]
@@ -67,7 +69,7 @@ export function QrOrderClient({
 
   async function loadActiveOrder() {
     try {
-      const res = await fetch(`/api/public/order?table=${encodeURIComponent(tableNumber)}`)
+      const res = await fetch(`/api/public/order?unitId=${encodeURIComponent(unitId)}&table=${encodeURIComponent(tableNumber)}`)
       if (res.ok) {
         const data = await res.json()
         setActiveOrder(data)
@@ -111,6 +113,7 @@ export function QrOrderClient({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          unitId,
           tableNumber,
           items: cart.map((i) => ({ menuItemId: i.menuItemId, qty: i.qty, note: i.note || null })),
         }),

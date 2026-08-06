@@ -12,6 +12,7 @@ export default async function PengaturanPage() {
   const [siteName, units] = await Promise.all([
     getSiteName(),
     prisma.businessUnit.findMany({
+      where: { tenantId: session.user.tenantId },
       select: { id: true, name: true, type: true, location: true },
       orderBy: { name: 'asc' },
     }),

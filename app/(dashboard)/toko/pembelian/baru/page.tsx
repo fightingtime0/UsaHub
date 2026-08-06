@@ -1,6 +1,7 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 import { BuatPOClient } from './_components/buat-po-client'
 
 export default async function BuatPOPage() {
@@ -8,7 +9,7 @@ export default async function BuatPOPage() {
   if (!session) redirect('/login')
   if (!['OWNER', 'MANAGER'].includes(session.user.role)) redirect('/toko/pembelian')
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'RETAIL', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'RETAIL')
   if (!unit) return <p>Unit tidak ditemukan.</p>
 
   const [suppliers, products] = await Promise.all([

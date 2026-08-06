@@ -7,6 +7,21 @@ async function main() {
   console.log('🌱 Seeding database...')
 
   // ============================================================
+  // TENANT
+  // ============================================================
+  const tenant = await prisma.tenant.upsert({
+    where: { id: 'tenant-demo' },
+    update: {},
+    create: {
+      id: 'tenant-demo',
+      name: 'Bisnis Terpadu Demo',
+      slug: 'demo',
+    },
+  })
+
+  console.log('✅ Tenant created')
+
+  // ============================================================
   // BUSINESS UNITS
   // ============================================================
   const toko = await prisma.businessUnit.upsert({
@@ -19,6 +34,7 @@ async function main() {
       location: 'Jl. Pasar Baru No. 12, Kota',
       phone: '0812-0001-0001',
       taxRate: 0,
+      tenantId: tenant.id,
     },
   })
 
@@ -32,6 +48,7 @@ async function main() {
       location: 'Jl. Bukit Indah No. 5, Pinggiran Kota',
       phone: '0812-0002-0002',
       taxRate: 0,
+      tenantId: tenant.id,
     },
   })
 
@@ -45,6 +62,7 @@ async function main() {
       location: 'Jl. Merdeka No. 88, Kota',
       phone: '0812-0003-0003',
       taxRate: 11,
+      tenantId: tenant.id,
     },
   })
 
@@ -58,6 +76,7 @@ async function main() {
       location: 'Jl. Merdeka No. 88, Kota', // satu lokasi dengan restoran
       phone: '0812-0004-0004',
       taxRate: 0,
+      tenantId: tenant.id,
     },
   })
 
@@ -71,6 +90,7 @@ async function main() {
       location: 'Jl. Raya Jetis KM 3',
       phone: '0812-0005-0005',
       taxRate: 0,
+      tenantId: tenant.id,
     },
   })
 
@@ -90,6 +110,7 @@ async function main() {
       password: hashedPassword,
       role: Role.OWNER,
       primaryUnitId: null,
+      tenantId: tenant.id,
     },
   })
 
@@ -102,6 +123,7 @@ async function main() {
       password: hashedPassword,
       role: Role.MANAGER,
       primaryUnitId: toko.id,
+      tenantId: tenant.id,
     },
   })
 
@@ -114,6 +136,7 @@ async function main() {
       password: hashedPassword,
       role: Role.CASHIER,
       primaryUnitId: restoran.id,
+      tenantId: tenant.id,
     },
   })
 
@@ -126,6 +149,7 @@ async function main() {
       password: hashedPassword,
       role: Role.STAFF,
       primaryUnitId: homestay.id,
+      tenantId: tenant.id,
     },
   })
 
@@ -138,6 +162,7 @@ async function main() {
       password: hashedPassword,
       role: Role.STAFF,
       primaryUnitId: pertashop.id,
+      tenantId: tenant.id,
     },
   })
 

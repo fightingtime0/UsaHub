@@ -24,9 +24,9 @@ export default async function HomestayBookingDetailPage({ params }: { params: Pr
 
   if (!booking) notFound()
 
-  // Verify this booking belongs to a HOMESTAY unit
+  // Verify this booking belongs to a HOMESTAY unit within the caller's tenant
   const unit = await prisma.businessUnit.findUnique({ where: { id: booking.unitId } })
-  if (!unit || unit.type !== 'HOMESTAY') notFound()
+  if (!unit || unit.type !== 'HOMESTAY' || unit.tenantId !== session.user.tenantId) notFound()
 
   const serialized = {
     ...serializeBooking(booking),

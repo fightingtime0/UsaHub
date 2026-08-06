@@ -26,6 +26,7 @@ enum UnitType {
 }
 
 enum Role {
+  SUPERADMIN // platform-level, tidak terikat tenant — provisioning tenant baru
   OWNER
   MANAGER
   STAFF
@@ -132,6 +133,25 @@ model AppSettings {
 }
 
 // ============================================================
+// TENANT — satu baris per bisnis yang berjalan di atas aplikasi ini.
+// SUPERADMIN mengelola tenant; OWNER/MANAGER/STAFF/CASHIER terikat ke satu tenant.
+// ============================================================
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String // "Bisnis1", "Bisnis2" — nama tampilan
+  slug      String   @unique // identifier url-safe, untuk kebutuhan subdomain ke depannya
+  isActive  Boolean  @default(true) // SUPERADMIN bisa suspend seluruh tenant
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  businessUnits BusinessUnit[]
+
+  @@map("tenants")
+}
+
+// ============================================================
 // AUTH & USER
 // ============================================================
 
@@ -145,7 +165,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // null = OWNER (akses semua unit)
+  // null hanya untuk SUPERADMIN (tidak terikat tenant manapun)
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id])
+
+  // null = OWNER (akses semua unit dalam tenant-nya)
   primaryUnitId String?
   primaryUnit   BusinessUnit? @relation(fields: [primaryUnitId], references: [id])
 
@@ -168,6 +192,9 @@ model BusinessUnit {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
 
   users          User[]
   products       Product[]

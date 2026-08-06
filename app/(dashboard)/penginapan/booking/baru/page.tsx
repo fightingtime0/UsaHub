@@ -1,6 +1,7 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 import { getTonightPrice } from '@/lib/pricing'
 import { BookingFormClient } from './_components/booking-form-client'
 
@@ -12,7 +13,7 @@ export default async function BookingBaruPage({
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'LODGING', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'LODGING')
   if (!unit) return <p>Unit tidak ditemukan.</p>
 
   const rooms = await prisma.room.findMany({

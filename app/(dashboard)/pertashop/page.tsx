@@ -1,12 +1,13 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns'
 import Link from 'next/link'
 
-async function getPertashopData() {
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'PERTASHOP', isActive: true } })
+async function getPertashopData(tenantId: string) {
+  const unit = await getTenantUnit(tenantId, 'PERTASHOP')
   if (!unit) return null
 
   const now = new Date()
@@ -53,7 +54,7 @@ export default async function PertashopPage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const data = await getPertashopData()
+  const data = await getPertashopData(session.user.tenantId!)
   if (!data) return <p className="text-red-500">Unit Pertashop tidak ditemukan. Tambahkan unit bisnis bertipe PERTASHOP terlebih dulu.</p>
 
   const { unit, products, todaySales, monthSales, monthPurchases, monthLoss, recentRecons } = data

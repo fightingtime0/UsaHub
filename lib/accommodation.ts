@@ -37,16 +37,16 @@ export type PaymentAddInput = {
 
 // ─── Unit resolver ─────────────────────────────────────────────────────────────
 
-export async function getAccomUnit(unitType: UnitType) {
+export async function getAccomUnit(tenantId: string, unitType: UnitType) {
   return prisma.businessUnit.findFirst({
-    where: { type: unitType, isActive: true },
+    where: { type: unitType, isActive: true, tenantId },
   })
 }
 
 // ─── Room list ─────────────────────────────────────────────────────────────────
 
-export async function getRooms(unitType: UnitType) {
-  const unit = await getAccomUnit(unitType)
+export async function getRooms(tenantId: string, unitType: UnitType) {
+  const unit = await getAccomUnit(tenantId, unitType)
   if (!unit) return null
 
   return prisma.room.findMany({
@@ -67,7 +67,7 @@ export async function getRooms(unitType: UnitType) {
 
 // ─── Pricing preview ──────────────────────────────────────────────────────────
 
-export async function previewPricing(roomId: string, checkIn: string, checkOut: string) {
+export async function previewPricing(tenantId: string, roomId: string, checkIn: string, checkOut: string) {
   const checkInDate  = new Date(checkIn)
   const checkOutDate = new Date(checkOut)
 
@@ -75,9 +75,9 @@ export async function previewPricing(roomId: string, checkIn: string, checkOut: 
 
   const room = await prisma.room.findUnique({
     where: { id: roomId },
-    include: { pricing: true },
+    include: { pricing: true, unit: { select: { tenantId: true } } },
   })
-  if (!room) return null
+  if (!room || room.unit.tenantId !== tenantId) return null
 
   const breakdown  = resolveNightlyPricing(checkInDate, checkOutDate, room.pricing)
   const total      = calcBookingTotal(breakdown)
@@ -88,8 +88,8 @@ export async function previewPricing(roomId: string, checkIn: string, checkOut: 
 
 // ─── Create booking ────────────────────────────────────────────────────────────
 
-export async function createBooking(unitType: UnitType, input: BookingCreateInput) {
-  const unit = await getAccomUnit(unitType)
+export async function createBooking(tenantId: string, unitType: UnitType, input: BookingCreateInput) {
+  const unit = await getAccomUnit(tenantId, unitType)
   if (!unit) throw new Error('Unit tidak ditemukan')
 
   const checkInDate  = startOfDay(new Date(input.checkIn))
@@ -112,7 +112,7 @@ export async function createBooking(unitType: UnitType, input: BookingCreateInpu
     where: { id: input.roomId },
     include: { pricing: true },
   })
-  if (!room || !room.isActive) throw new Error('Kamar tidak tersedia')
+  if (!room || !room.isActive || room.unitId !== unit.id) throw new Error('Kamar tidak tersedia')
 
   const breakdown    = resolveNightlyPricing(checkInDate, checkOutDate, room.pricing)
   const totalNights  = breakdown.length
@@ -167,7 +167,7 @@ export async function createBooking(unitType: UnitType, input: BookingCreateInpu
 
 // ─── Update booking status ────────────────────────────────────────────────────
 
-export async function updateBookingStatus(bookingId: string, newStatus: string) {
+export async function updateBookingStatus(tenantId: string, bookingId: string, newStatus: string) {
   const VALID: Record<string, string[]> = {
     PENDING:    ['CONFIRMED', 'CANCELLED'],
     CONFIRMED:  ['CHECKED_IN', 'CANCELLED'],
@@ -176,9 +176,9 @@ export async function updateBookingStatus(bookingId: string, newStatus: string) 
 
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
-    include: { room: true },
+    include: { room: true, unit: { select: { tenantId: true } } },
   })
-  if (!booking) throw new Error('Booking tidak ditemukan')
+  if (!booking || booking.unit.tenantId !== tenantId) throw new Error('Booking tidak ditemukan')
   if (!VALID[booking.status]?.includes(newStatus)) {
     throw new Error(`Tidak bisa ubah status dari ${booking.status} ke ${newStatus}`)
   }
@@ -207,12 +207,12 @@ export async function updateBookingStatus(bookingId: string, newStatus: string) 
 
 // ─── Add payment ──────────────────────────────────────────────────────────────
 
-export async function addPayment(input: PaymentAddInput) {
+export async function addPayment(tenantId: string, input: PaymentAddInput) {
   const booking = await prisma.booking.findUnique({
     where: { id: input.bookingId },
-    include: { payments: true },
+    include: { payments: true, unit: { select: { tenantId: true } } },
   })
-  if (!booking) throw new Error('Booking tidak ditemukan')
+  if (!booking || booking.unit.tenantId !== tenantId) throw new Error('Booking tidak ditemukan')
   if (['CANCELLED', 'CHECKED_OUT'].includes(booking.status)) {
     throw new Error('Booking sudah selesai atau dibatalkan')
   }

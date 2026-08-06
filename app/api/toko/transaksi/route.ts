@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 import { generateInvoiceNumber, calculateTax } from '@/lib/utils'
 import { startOfDay, endOfDay } from 'date-fns'
 
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
   const page = parseInt(searchParams.get('page') ?? '1')
   const limit = parseInt(searchParams.get('limit') ?? '20')
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'RETAIL', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'RETAIL')
   if (!unit) return NextResponse.json({ error: 'Unit tidak ditemukan' }, { status: 404 })
 
   const dateFilter = dateStr
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Metode pembayaran wajib dipilih' }, { status: 400 })
   }
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'RETAIL', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'RETAIL')
   if (!unit) return NextResponse.json({ error: 'Unit tidak ditemukan' }, { status: 404 })
 
   // Validasi stok semua produk

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 
 export async function GET(req: NextRequest) {
   const session = await getSession()
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
   const categoryId = searchParams.get('categoryId') ?? undefined
   const search = searchParams.get('search') ?? ''
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'RESTAURANT', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'RESTAURANT')
   if (!unit) return NextResponse.json({ error: 'Unit tidak ditemukan' }, { status: 404 })
 
   const menus = await prisma.menuItem.findMany({
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Nama dan harga wajib diisi' }, { status: 400 })
   }
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'RESTAURANT', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'RESTAURANT')
   if (!unit) return NextResponse.json({ error: 'Unit tidak ditemukan' }, { status: 404 })
 
   const menuItem = await prisma.menuItem.create({

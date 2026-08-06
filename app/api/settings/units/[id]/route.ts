@@ -16,13 +16,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!name) return NextResponse.json({ error: 'Nama tidak boleh kosong' }, { status: 400 })
   const location = typeof body.location === 'string' ? body.location.trim() : ''
 
-  const existing = await prisma.businessUnit.findUnique({ where: { id } })
-  if (!existing) return NextResponse.json({ error: 'Unit bisnis tidak ditemukan' }, { status: 404 })
-
-  const unit = await prisma.businessUnit.update({
-    where: { id },
+  const result = await prisma.businessUnit.updateMany({
+    where: { id, tenantId: session.user.tenantId },
     data: { name, location: location || null },
   })
+  if (result.count === 0) return NextResponse.json({ error: 'Unit bisnis tidak ditemukan' }, { status: 404 })
 
-  return NextResponse.json({ success: true, id: unit.id, name: unit.name, location: unit.location })
+  const unit = await prisma.businessUnit.findUnique({ where: { id } })
+
+  return NextResponse.json({ success: true, id: unit!.id, name: unit!.name, location: unit!.location })
 }

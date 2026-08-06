@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 import { getTonightPrice } from '@/lib/pricing'
 
 export async function GET() {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'LODGING', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'LODGING')
   if (!unit) return NextResponse.json({ error: 'Unit tidak ditemukan' }, { status: 404 })
 
   const rooms = await prisma.room.findMany({

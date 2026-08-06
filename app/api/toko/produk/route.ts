@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 
 export async function GET(req: NextRequest) {
   const session = await getSession()
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
   const categoryId = searchParams.get('categoryId') ?? undefined
   const lowStock = searchParams.get('lowStock') === 'true'
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'RETAIL', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'RETAIL')
   if (!unit) return NextResponse.json({ error: 'Unit tidak ditemukan' }, { status: 404 })
 
   const products = await prisma.product.findMany({
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Field wajib tidak lengkap' }, { status: 400 })
   }
 
-  const businessUnit = await prisma.businessUnit.findFirst({ where: { type: 'RETAIL', isActive: true } })
+  const businessUnit = await getTenantUnit(session.user.tenantId!, 'RETAIL')
   if (!businessUnit) return NextResponse.json({ error: 'Unit tidak ditemukan' }, { status: 404 })
 
   const product = await prisma.$transaction(async (tx) => {

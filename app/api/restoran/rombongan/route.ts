@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 import { generateInvoiceNumber } from '@/lib/utils'
 
 // GET — daftar pesanan rombongan
@@ -8,7 +9,7 @@ export async function GET() {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'RESTAURANT', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'RESTAURANT')
   if (!unit) return NextResponse.json({ error: 'Unit Restoran tidak ditemukan' }, { status: 404 })
 
   const orders = await prisma.groupOrder.findMany({
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Jumlah pax harus lebih dari 0' }, { status: 400 })
   }
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'RESTAURANT', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'RESTAURANT')
   if (!unit) return NextResponse.json({ error: 'Unit Restoran tidak ditemukan' }, { status: 404 })
 
   const totalPrice = Number(pax) * Number(pricePerPax)

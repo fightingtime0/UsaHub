@@ -6,7 +6,18 @@ export default withAuth(
     const token = req.nextauth.token
     const pathname = req.nextUrl.pathname
 
-    // OWNER bisa akses semua
+    // SUPERADMIN tidak terikat tenant manapun — hanya boleh akses /superadmin,
+    // tidak pernah masuk ke halaman bisnis (semua sudah dilingkupkan per tenant).
+    if (token?.role === 'SUPERADMIN') {
+      if (pathname.startsWith('/superadmin')) return NextResponse.next()
+      return NextResponse.redirect(new URL('/superadmin', req.url))
+    }
+    // Sebaliknya, role tenant (OWNER/MANAGER/STAFF/CASHIER) tidak boleh masuk /superadmin.
+    if (pathname.startsWith('/superadmin')) {
+      return NextResponse.redirect(new URL('/dashboard', req.url))
+    }
+
+    // OWNER bisa akses semua unit dalam tenant-nya sendiri
     if (token?.role === 'OWNER') return NextResponse.next()
 
     // Guard per modul berdasarkan primaryUnitType
@@ -45,5 +56,5 @@ export default withAuth(
 )
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/toko/:path*', '/homestay/:path*', '/restoran/:path*', '/penginapan/:path*', '/pertashop/:path*', '/b2b/:path*', '/sdm/:path*', '/laporan/:path*'],
+  matcher: ['/dashboard/:path*', '/toko/:path*', '/homestay/:path*', '/restoran/:path*', '/penginapan/:path*', '/pertashop/:path*', '/b2b/:path*', '/sdm/:path*', '/laporan/:path*', '/superadmin/:path*'],
 }

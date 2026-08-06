@@ -12,10 +12,13 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
     include: {
       category: true,
       stockMovements: { orderBy: { createdAt: 'desc' }, take: 20 },
+      unit_rel: { select: { tenantId: true } },
     },
   })
 
-  if (!product) return NextResponse.json({ error: 'Produk tidak ditemukan' }, { status: 404 })
+  if (!product || product.unit_rel.tenantId !== session.user.tenantId) {
+    return NextResponse.json({ error: 'Produk tidak ditemukan' }, { status: 404 })
+  }
   return NextResponse.json(product)
 }
 
@@ -24,6 +27,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const session = await getSession()
   if (!session || !['OWNER', 'MANAGER'].includes(session.user.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const existing = await prisma.product.findUnique({ where: { id }, include: { unit_rel: { select: { tenantId: true } } } })
+  if (!existing || existing.unit_rel.tenantId !== session.user.tenantId) {
+    return NextResponse.json({ error: 'Produk tidak ditemukan' }, { status: 404 })
   }
 
   const body = await req.json()
@@ -51,6 +59,11 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
   const session = await getSession()
   if (!session || !['OWNER', 'MANAGER'].includes(session.user.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const existing = await prisma.product.findUnique({ where: { id }, include: { unit_rel: { select: { tenantId: true } } } })
+  if (!existing || existing.unit_rel.tenantId !== session.user.tenantId) {
+    return NextResponse.json({ error: 'Produk tidak ditemukan' }, { status: 404 })
   }
 
   // Soft delete

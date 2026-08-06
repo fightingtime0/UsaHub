@@ -1,6 +1,7 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 import { formatRupiah } from '@/lib/utils'
 import Link from 'next/link'
 
@@ -8,7 +9,7 @@ export default async function BahanBakuPage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'RESTAURANT', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'RESTAURANT')
   if (!unit) return <p>Unit tidak ditemukan.</p>
 
   const products = await prisma.product.findMany({

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession, hasUnitAccess } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 
 // Membuat produk baru / mengubah harga & status master hanya untuk OWNER & MANAGER —
 // STAFF/CASHIER pertashop hanya mencatat transaksi harian (belanja/penjualan), bukan mengubah master harga.
@@ -14,7 +15,7 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasUnitAccess(session, 'PERTASHOP')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'PERTASHOP', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'PERTASHOP')
   if (!unit) return NextResponse.json({ error: 'Unit Pertashop tidak ditemukan' }, { status: 404 })
 
   const products = await prisma.fuelProduct.findMany({
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Nama, harga beli, dan harga jual wajib diisi' }, { status: 400 })
   }
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'PERTASHOP', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'PERTASHOP')
   if (!unit) return NextResponse.json({ error: 'Unit Pertashop tidak ditemukan' }, { status: 404 })
 
   const product = await prisma.fuelProduct.create({
@@ -65,8 +66,13 @@ export async function PATCH(req: NextRequest) {
 
   if (!id) return NextResponse.json({ error: 'id produk diperlukan' }, { status: 400 })
 
-  const existing = await prisma.fuelProduct.findUnique({ where: { id } })
-  if (!existing) return NextResponse.json({ error: 'Produk tidak ditemukan' }, { status: 404 })
+  const existing = await prisma.fuelProduct.findUnique({
+    where: { id },
+    include: { unit: { select: { tenantId: true } } },
+  })
+  if (!existing || existing.unit.tenantId !== session.user.tenantId) {
+    return NextResponse.json({ error: 'Produk tidak ditemukan' }, { status: 404 })
+  }
 
   const product = await prisma.fuelProduct.update({
     where: { id },

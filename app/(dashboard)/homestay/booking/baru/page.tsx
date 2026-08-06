@@ -1,6 +1,7 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 import { HomestayBookingFormClient } from './_components/booking-form-client'
 
 export default async function BookingBaruPage({
@@ -11,7 +12,7 @@ export default async function BookingBaruPage({
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'HOMESTAY', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'HOMESTAY')
   if (!unit) return <p className="p-6 text-gray-500">Unit Homestay tidak ditemukan.</p>
 
   const rooms = await prisma.room.findMany({

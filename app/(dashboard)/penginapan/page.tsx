@@ -1,13 +1,14 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { getTonightPrice } from '@/lib/pricing'
 import { startOfDay, addDays } from 'date-fns'
 import Link from 'next/link'
 
-async function getPenginapanData() {
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'LODGING', isActive: true } })
+async function getPenginapanData(tenantId: string) {
+  const unit = await getTenantUnit(tenantId, 'LODGING')
   if (!unit) return null
 
   const now = new Date()
@@ -77,7 +78,7 @@ export default async function PenginapanPage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const data = await getPenginapanData()
+  const data = await getPenginapanData(session.user.tenantId!)
   if (!data) return <p className="text-red-500">Unit Penginapan tidak ditemukan.</p>
 
   const { unit, rooms, occupied, available, maint, todayCheckIns, todayCheckOuts, upcomingBookings } = data

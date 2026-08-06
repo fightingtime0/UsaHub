@@ -1,14 +1,13 @@
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { formatRupiah, formatDateTime } from '@/lib/utils'
 import { startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns'
 
-async function getTokoStats() {
-  const unit = await prisma.businessUnit.findFirst({
-    where: { type: 'RETAIL', isActive: true },
-  })
+async function getTokoStats(tenantId: string) {
+  const unit = await getTenantUnit(tenantId, 'RETAIL')
   if (!unit) return null
 
   const now = new Date()
@@ -66,7 +65,7 @@ export default async function TokoPage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const data = await getTokoStats()
+  const data = await getTokoStats(session.user.tenantId!)
   if (!data) return <p className="text-red-500">Unit Toko tidak ditemukan.</p>
 
   const { unit, todayTrx, monthTrx, recentTrx, lowStock, pendingPO } = data

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 import { generateInvoiceNumber } from '@/lib/utils'
 
 // GET — semua order yang aktif (OPEN/BILLED) + summary per meja
@@ -8,7 +9,7 @@ export async function GET() {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'RESTAURANT', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'RESTAURANT')
   if (!unit) return NextResponse.json({ error: 'Unit tidak ditemukan' }, { status: 404 })
 
   const orders = await prisma.tableOrder.findMany({
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Nomor meja wajib diisi' }, { status: 400 })
   }
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'RESTAURANT', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'RESTAURANT')
   if (!unit) return NextResponse.json({ error: 'Unit tidak ditemukan' }, { status: 404 })
 
   // Cek apakah meja sudah ada order OPEN

@@ -1,6 +1,7 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { startOfMonth, endOfMonth, subMonths, format, differenceInCalendarMonths } from 'date-fns'
 import Link from 'next/link'
@@ -52,7 +53,7 @@ export default async function LaporanPertashopPage({
   const mStart = startOfMonth(now)
   const mEnd = endOfMonth(now)
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'PERTASHOP', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'PERTASHOP')
   if (!unit) return <p className="text-red-500">Unit Pertashop tidak ditemukan.</p>
 
   const [products, settings, payroll, expenseAgg] = await Promise.all([

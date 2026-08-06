@@ -1,6 +1,7 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 import { formatRupiah, formatDateTime } from '@/lib/utils'
 import { startOfDay, endOfDay } from 'date-fns'
 import Link from 'next/link'
@@ -23,7 +24,7 @@ export default async function RiwayatRestoranPage({
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'RESTAURANT', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'RESTAURANT')
   if (!unit) return <p>Unit tidak ditemukan.</p>
 
   const dateStr = searchParams.date ?? new Date().toISOString().slice(0, 10)

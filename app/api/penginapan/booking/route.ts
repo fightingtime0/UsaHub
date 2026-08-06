@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 import { resolveNightlyPricing, calcBookingTotal, generateBookingCode } from '@/lib/pricing'
 import { startOfDay } from 'date-fns'
 
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
   const page   = parseInt(searchParams.get('page') ?? '1')
   const limit  = 20
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'LODGING', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'LODGING')
   if (!unit) return NextResponse.json({ error: 'Unit tidak ditemukan' }, { status: 404 })
 
   const [bookings, total] = await Promise.all([
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'checkOut harus setelah checkIn' }, { status: 400 })
   }
 
-  const unit = await prisma.businessUnit.findFirst({ where: { type: 'LODGING', isActive: true } })
+  const unit = await getTenantUnit(session.user.tenantId!, 'LODGING')
   if (!unit) return NextResponse.json({ error: 'Unit tidak ditemukan' }, { status: 404 })
 
   // Cek konflik booking pada kamar yang sama
@@ -103,7 +104,7 @@ export async function POST(req: NextRequest) {
     where: { id: roomId },
     include: { pricing: true },
   })
-  if (!room) return NextResponse.json({ error: 'Kamar tidak ditemukan' }, { status: 404 })
+  if (!room || room.unitId !== unit.id) return NextResponse.json({ error: 'Kamar tidak ditemukan' }, { status: 404 })
   if (!room.isActive) return NextResponse.json({ error: 'Kamar tidak tersedia' }, { status: 400 })
 
   // Hitung harga dinamis

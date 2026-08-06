@@ -35,6 +35,7 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           email: user.email,
           role: user.role,
+          tenantId: user.tenantId,
           primaryUnitId: user.primaryUnitId,
           primaryUnitType: user.primaryUnit?.type ?? null,
         }
@@ -46,6 +47,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id
         token.role = (user as any).role
+        token.tenantId = (user as any).tenantId
         token.primaryUnitId = (user as any).primaryUnitId
         token.primaryUnitType = (user as any).primaryUnitType
       }
@@ -55,12 +57,21 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id as string
         session.user.role = token.role as Role
+        session.user.tenantId = token.tenantId as string | null
         session.user.primaryUnitId = token.primaryUnitId as string | null
         session.user.primaryUnitType = token.primaryUnitType as string | null
       }
       return session
     },
   },
+}
+
+// Tenant terikat wajib untuk semua role kecuali SUPERADMIN (yang tidak terikat tenant manapun).
+// Lempar redirect ke halaman yang tepat kalau dipanggil dari konteks yang salah.
+export function requireTenantId(session: Awaited<ReturnType<typeof getSession>>): string {
+  const tenantId = session?.user?.tenantId
+  if (!tenantId) throw new Error('Sesi ini tidak terikat tenant manapun (kemungkinan akun SUPERADMIN)')
+  return tenantId
 }
 
 export const getSession = () => getServerSession(authOptions)

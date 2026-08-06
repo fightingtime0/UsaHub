@@ -77,8 +77,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Setoran tidak boleh negatif' }, { status: 400 })
   }
 
-  const product = await prisma.fuelProduct.findUnique({ where: { id: fuelProductId } })
-  if (!product || !product.isActive) {
+  const product = await prisma.fuelProduct.findUnique({
+    where: { id: fuelProductId },
+    include: { unit: { select: { tenantId: true } } },
+  })
+  if (!product || !product.isActive || product.unit.tenantId !== session.user.tenantId) {
     return NextResponse.json({ error: 'Produk BBM tidak ditemukan' }, { status: 404 })
   }
 

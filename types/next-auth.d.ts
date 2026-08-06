@@ -9,6 +9,7 @@ declare module 'next-auth' {
       name: string
       email: string
       role: Role
+      tenantId: string | null
       primaryUnitId: string | null
       primaryUnitType: string | null
     }
@@ -19,6 +20,7 @@ declare module 'next-auth/jwt' {
   interface JWT {
     id: string
     role: Role
+    tenantId: string | null
     primaryUnitId: string | null
     primaryUnitType: string | null
   }

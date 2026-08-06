@@ -1,6 +1,7 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { getTenantUnit } from '@/lib/tenant'
 import { B2BInvoiceFormClient } from './_components/invoice-form-client'
 
 export default async function B2BBaruPage() {
@@ -9,8 +10,8 @@ export default async function B2BBaruPage() {
   if (!['OWNER', 'MANAGER'].includes(session.user.role)) redirect('/dashboard')
 
   const [units, tokoUnit] = await Promise.all([
-    prisma.businessUnit.findMany({ where: { isActive: true }, select: { id: true, name: true, type: true, taxRate: true } }),
-    prisma.businessUnit.findFirst({ where: { type: 'RETAIL', isActive: true } }),
+    prisma.businessUnit.findMany({ where: { isActive: true, tenantId: session.user.tenantId }, select: { id: true, name: true, type: true, taxRate: true } }),
+    getTenantUnit(session.user.tenantId!, 'RETAIL'),
   ])
 
   const tokoProducts = tokoUnit ? await prisma.product.findMany({

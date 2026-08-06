@@ -17,10 +17,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const order = await prisma.purchaseOrder.findUnique({
     where: { id: id },
-    include: { items: { include: { product: true } } },
+    include: { items: { include: { product: true } }, unit: { select: { tenantId: true } } },
   })
 
-  if (!order) return NextResponse.json({ error: 'PO tidak ditemukan' }, { status: 404 })
+  if (!order || order.unit.tenantId !== session.user.tenantId) {
+    return NextResponse.json({ error: 'PO tidak ditemukan' }, { status: 404 })
+  }
   if (order.status === 'RECEIVED' || order.status === 'CANCELLED') {
     return NextResponse.json({ error: 'PO sudah selesai atau dibatalkan' }, { status: 400 })
   }
