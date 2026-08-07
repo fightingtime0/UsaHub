@@ -5,7 +5,7 @@ import { getTenantUnit } from '@/lib/tenant'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { startOfMonth, endOfMonth, subMonths, format, differenceInCalendarMonths } from 'date-fns'
 import Link from 'next/link'
-import { BiayaGajiInline } from './_components/biaya-gaji-inline'
+import { BiayaGajiSummary } from './_components/biaya-gaji-summary'
 import { PengaturanInvestasiInline } from './_components/pengaturan-investasi-inline'
 
 const LITER_FMT = { maximumFractionDigits: 2 }
@@ -56,10 +56,11 @@ export default async function LaporanPertashopPage({
   const unit = await getTenantUnit(session.user.tenantId!, 'PERTASHOP')
   if (!unit) return <p className="text-red-500">Unit Pertashop tidak ditemukan.</p>
 
-  const [products, settings, payroll, expenseAgg] = await Promise.all([
+  const [products, settings, payrollAgg, payrollPeriod, expenseAgg] = await Promise.all([
     prisma.fuelProduct.findMany({ where: { unitId: unit.id }, orderBy: { name: 'asc' } }),
     prisma.fuelSettings.findUnique({ where: { unitId: unit.id } }),
-    prisma.fuelPayrollExpense.findUnique({ where: { unitId_month: { unitId: unit.id, month: mStart } } }),
+    prisma.payrollEntry.aggregate({ where: { period: { unitId: unit.id, month: mStart } }, _sum: { netTotal: true } }),
+    prisma.payrollPeriod.findUnique({ where: { unitId_month: { unitId: unit.id, month: mStart } } }),
     prisma.fuelExpense.aggregate({ where: { unitId: unit.id, date: { gte: mStart, lte: mEnd } }, _sum: { amount: true } }),
   ])
 
@@ -118,7 +119,7 @@ export default async function LaporanPertashopPage({
   const lossLiterTotal = productReports.reduce((s, r) => s + r.lossLiter, 0)
   const labaOperasional = grossProfitTotal - lossRpTotal
 
-  const biayaGaji = payroll ? Number(payroll.amount) : 0
+  const biayaGaji = Number(payrollAgg._sum.netTotal ?? 0)
   const biayaOprasional = Number(expenseAgg._sum.amount ?? 0)
 
   const investmentAmount = settings ? Number(settings.investmentAmount) : 0
@@ -302,7 +303,12 @@ export default async function LaporanPertashopPage({
           </div>
 
           <div className="pt-2 space-y-1.5 border-t border-gray-100">
-            <BiayaGajiInline month={format(mStart, 'yyyy-MM')} initialAmount={biayaGaji} />
+            <BiayaGajiSummary
+              month={format(mStart, 'yyyy-MM')}
+              unitId={unit.id}
+              amount={biayaGaji}
+              filled={payrollPeriod !== null}
+            />
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Biaya Oprasional</span>
               <span className="font-medium text-red-600">−{formatRupiah(biayaOprasional)}</span>
@@ -326,7 +332,8 @@ export default async function LaporanPertashopPage({
 
       <p className="text-xs text-gray-400">
         Catatan: Selisih (Loss) dinilai memakai harga jual produk saat ini (tidak ada riwayat harga historis).
-        Biaya Gaji diisi manual tiap bulan. Biaya Oprasional dijumlahkan otomatis dari Biaya Pengeluaran yang dicatat saat input transaksi/rekonsiliasi.
+        Biaya Gaji dihitung otomatis dari modul Gaji (SDM) — total gaji bersih semua karyawan unit ini bulan tsb.
+        Biaya Oprasional dijumlahkan otomatis dari Biaya Pengeluaran yang dicatat saat input transaksi/rekonsiliasi.
       </p>
     </div>
   )

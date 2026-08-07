@@ -209,6 +209,7 @@ model BusinessUnit {
   tableOrders    TableOrder[]
   employees      Employee[]      @relation("PrimaryUnit")
   shifts         Shift[]
+  payrollPeriods PayrollPeriod[]
 
   fuelProducts        FuelProduct[]
   fuelPurchases       FuelPurchase[]
@@ -217,7 +218,6 @@ model BusinessUnit {
   fuelReconciliations FuelReconciliation[]
   fuelExpenses        FuelExpense[]
   fuelSettings        FuelSettings?
-  fuelPayrollExpenses FuelPayrollExpense[]
   groupOrders         GroupOrder[]
 
   @@map("business_units")
@@ -859,23 +859,6 @@ model FuelSettings {
   @@map("fuel_settings")
 }
 
-// Biaya Gaji bulanan Pertashop — diinput manual tiap bulan (beda-beda karena lembur/bonus/potongan),
-// dipakai di Laporan Laba/Rugi. Satu baris per unit per bulan (upsert).
-model FuelPayrollExpense {
-  id        String   @id @default(cuid())
-  month     DateTime @db.Date // disimpan sebagai tanggal 1 pada bulan tsb
-  amount    Decimal  @db.Decimal(14, 2)
-  note      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  unitId String
-  unit   BusinessUnit @relation(fields: [unitId], references: [id])
-
-  @@unique([unitId, month])
-  @@map("fuel_payroll_expenses")
-}
-
 // ============================================================
 // RESTORAN — PESAN ROMBONGAN
 // ============================================================
@@ -939,6 +922,8 @@ model Employee {
   fuelExpenses        FuelExpense[]
   fuelReconciliations FuelReconciliation[]
 
+  payrollEntries PayrollEntry[]
+
   @@map("employees")
 }
 
@@ -959,4 +944,77 @@ model Shift {
   @@index([employeeId, date])
   @@index([unitId, date])
   @@map("shifts")
+}
+
+// ============================================================
+// GAJI — payroll per-karyawan, lintas semua unit bisnis.
+// Satu PayrollPeriod per unit per bulan; satu PayrollEntry per karyawan
+// dalam periode itu (gaji pokok + baris tambahan/potongan bebas nama,
+// mis. "Insentif Penjualan", "Bonus Lembur", "Potongan Kasbon").
+// ============================================================
+
+enum PayrollStatus {
+  DRAFT
+  PAID
+}
+
+enum PayrollItemType {
+  TAMBAHAN // insentif, bonus, tunjangan, dll — menambah gaji
+  POTONGAN // kasbon, absen, dll — mengurangi gaji
+}
+
+model PayrollPeriod {
+  id        String        @id @default(cuid())
+  month     DateTime      @db.Date // disimpan sebagai tanggal 1 pada bulan tsb
+  status    PayrollStatus @default(DRAFT)
+  paidAt    DateTime?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  unitId String
+  unit   BusinessUnit @relation(fields: [unitId], references: [id])
+
+  entries PayrollEntry[]
+
+  @@unique([unitId, month])
+  @@map("payroll_periods")
+}
+
+// Gaji satu karyawan dalam satu periode. baseSalary di-snapshot dari
+// Employee.salary saat entry pertama dibuat (tapi tetap bisa diedit per-periode,
+// karena gaji pokok kadang berubah/di-prorata tanpa harus ubah data master karyawan).
+model PayrollEntry {
+  id              String   @id @default(cuid())
+  baseSalary      Decimal  @default(0) @db.Decimal(14, 2)
+  totalAdditions  Decimal  @default(0) @db.Decimal(14, 2) // jumlah semua item TAMBAHAN
+  totalDeductions Decimal  @default(0) @db.Decimal(14, 2) // jumlah semua item POTONGAN
+  netTotal        Decimal  @default(0) @db.Decimal(14, 2) // baseSalary + totalAdditions - totalDeductions
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  periodId String
+  period   PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+
+  items PayrollItem[]
+
+  @@unique([periodId, employeeId])
+  @@map("payroll_entries")
+}
+
+// Baris tambahan/potongan bebas nama — "label" bisa diisi "Insentif Penjualan",
+// "Bonus Lembur", "Tunjangan Transport", "Potongan Kasbon", dll.
+model PayrollItem {
+  id     String          @id @default(cuid())
+  type   PayrollItemType
+  label  String
+  amount Decimal         @db.Decimal(14, 2) // selalu positif; arah tambah/kurang ditentukan `type`
+
+  entryId String
+  entry   PayrollEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@map("payroll_items")
 }

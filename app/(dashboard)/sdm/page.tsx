@@ -1,6 +1,7 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import Link from 'next/link'
 import { SdmClient } from './_components/sdm-client'
 
 export default async function SdmPage() {
@@ -38,9 +39,15 @@ export default async function SdmPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">SDM — Sumber Daya Manusia</h1>
-        <p className="text-xs md:text-sm text-gray-500 mt-0.5">Manajemen karyawan semua unit bisnis</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">SDM — Sumber Daya Manusia</h1>
+          <p className="text-xs md:text-sm text-gray-500 mt-0.5">Manajemen karyawan semua unit bisnis</p>
+        </div>
+        <Link href="/sdm/gaji"
+          className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors">
+          Kelola Gaji
+        </Link>
       </div>
 
       {/* Unit summary */}
