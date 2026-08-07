@@ -2,7 +2,8 @@
 
 import { useState, useRef } from 'react'
 import { formatRupiah } from '@/lib/utils'
-import { Receipt, printReceipt } from '@/components/receipt'
+import { Receipt, printReceipt, type ReceiptData } from '@/components/receipt'
+import { printViaRawBT, isAndroid } from '@/lib/escpos'
 
 type Product = {
   id: string
@@ -11,6 +12,7 @@ type Product = {
   unit: string
   sellPrice: number
   stock: number
+  imageUrl: string | null
   category: { id: string; name: string } | null
 }
 
@@ -28,6 +30,28 @@ type Props = {
   taxRate: number
   unitName: string
   unitLocation: string | null
+}
+
+function buildReceiptData(receipt: any, unitName: string, unitLocation: string | null): ReceiptData {
+  return {
+    storeName: unitName,
+    storeLocation: unitLocation,
+    invoiceNumber: receipt.invoiceNumber,
+    dateTime: receipt.createdAt ?? new Date(),
+    items: (receipt.items ?? []).map((item: any) => ({
+      name: item.product.name,
+      qty: Number(item.qty),
+      price: Number(item.price),
+      subtotal: Number(item.subtotal),
+    })),
+    subtotal: Number(receipt.subtotal),
+    discount: Number(receipt.discount),
+    tax: Number(receipt.tax),
+    total: Number(receipt.total),
+    paymentMethod: receipt.paymentMethod,
+    paidAmount: Number(receipt.paidAmount),
+    change: Number(receipt.change),
+  }
 }
 
 const PAYMENT_METHODS = [
@@ -202,6 +226,12 @@ export function KasirClient({ products, categories, taxRate, unitName, unitLocat
                       : 'border-gray-100 shadow-sm hover:border-blue-200'
                   } disabled:opacity-40 disabled:cursor-not-allowed`}
                 >
+                  {p.imageUrl && (
+                    <div className="w-full aspect-square rounded-lg overflow-hidden mb-2 bg-gray-50">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={p.imageUrl} alt="" className="w-full h-full object-cover" />
+                    </div>
+                  )}
                   <div className="flex items-start justify-between gap-1 mb-2">
                     <p className="text-sm font-semibold text-gray-900 leading-snug">{p.name}</p>
                     {inCart && (
@@ -434,7 +464,7 @@ export function KasirClient({ products, categories, taxRate, unitName, unitLocat
               </div>
             </div>
 
-            <div className="px-5 pb-5 flex gap-3">
+            <div className="px-5 pb-2 flex gap-3">
               <button
                 onClick={printReceipt}
                 className="flex-1 py-2.5 border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold rounded-lg text-sm transition-colors"
@@ -448,30 +478,21 @@ export function KasirClient({ products, categories, taxRate, unitName, unitLocat
                 Transaksi Baru
               </button>
             </div>
+            {isAndroid() && (
+              <div className="px-5 pb-5">
+                <button
+                  onClick={() => printViaRawBT(buildReceiptData(receipt, unitName, unitLocation))}
+                  className="w-full py-2 border border-blue-200 hover:bg-blue-50 text-blue-700 font-semibold rounded-lg text-xs transition-colors"
+                >
+                  📶 Cetak via Bluetooth (RawBT)
+                </button>
+                <p className="text-[10px] text-gray-400 text-center mt-1">Perlu app RawBT terinstall</p>
+              </div>
+            )}
           </div>
 
           {/* Struk print (hanya muncul saat cetak) */}
-          <Receipt
-            data={{
-              storeName: unitName,
-              storeLocation: unitLocation,
-              invoiceNumber: receipt.invoiceNumber,
-              dateTime: receipt.createdAt ?? new Date(),
-              items: (receipt.items ?? []).map((item: any) => ({
-                name: item.product.name,
-                qty: Number(item.qty),
-                price: Number(item.price),
-                subtotal: Number(item.subtotal),
-              })),
-              subtotal: Number(receipt.subtotal),
-              discount: Number(receipt.discount),
-              tax: Number(receipt.tax),
-              total: Number(receipt.total),
-              paymentMethod: receipt.paymentMethod,
-              paidAmount: Number(receipt.paidAmount),
-              change: Number(receipt.change),
-            }}
-          />
+          <Receipt data={buildReceiptData(receipt, unitName, unitLocation)} />
         </div>
       )}
     </div>

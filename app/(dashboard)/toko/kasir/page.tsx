@@ -26,6 +26,7 @@ export default async function KasirPage() {
     unit: p.unit,
     sellPrice: Number(p.sellPrice),
     stock: Number(p.stock),
+    imageUrl: p.imageUrl,
     category: p.category ? { id: p.category.id, name: p.category.name } : null,
   }))
 

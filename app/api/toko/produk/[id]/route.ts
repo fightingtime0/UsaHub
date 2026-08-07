@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { deleteFromR2, r2KeyFromUrl } from '@/lib/r2'
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -35,7 +36,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   const body = await req.json()
-  const { name, sku, unit, costPrice, sellPrice, minStock, categoryId } = body
+  const { name, sku, unit, costPrice, sellPrice, minStock, categoryId, imageUrl } = body
 
   const product = await prisma.product.update({
     where: { id: id },
@@ -47,9 +48,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       sellPrice,
       minStock,
       categoryId: categoryId || null,
+      imageUrl: imageUrl || null,
     },
     include: { category: true },
   })
+
+  // Best-effort: bersihkan gambar lama di R2 kalau diganti/dihapus
+  if (existing.imageUrl && existing.imageUrl !== product.imageUrl) {
+    const oldKey = r2KeyFromUrl(existing.imageUrl)
+    if (oldKey) deleteFromR2(oldKey).catch(() => {})
+  }
 
   return NextResponse.json(product)
 }

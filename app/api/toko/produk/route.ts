@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { name, sku, unit: unitSatuan, costPrice, sellPrice, stock, minStock, categoryId } = body
+  const { name, sku, unit: unitSatuan, costPrice, sellPrice, stock, minStock, categoryId, imageUrl } = body
 
   if (!name || !unitSatuan || costPrice == null || sellPrice == null) {
     return NextResponse.json({ error: 'Field wajib tidak lengkap' }, { status: 400 })
@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
         sellPrice,
         stock: stock ?? 0,
         minStock: minStock ?? 0,
+        imageUrl: imageUrl || null,
         unitId: businessUnit.id,
         categoryId: categoryId || null,
       },

@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatRupiah } from '@/lib/utils'
+import { ImageUpload } from '@/components/image-upload'
 import type { Role } from '@prisma/client'
 
 type Category = { id: string; name: string }
@@ -15,6 +16,7 @@ type Product = {
   sellPrice: number
   stock: number
   minStock: number
+  imageUrl: string | null
   category: Category | null
 }
 
@@ -44,7 +46,7 @@ export function ProdukClient({ initialProducts, categories, unitId, userRole }: 
   const [saving, setSaving] = useState(false)
 
   // Form state
-  const emptyForm = { name: '', sku: '', unit: 'pcs', costPrice: '', sellPrice: '', stock: '', minStock: '', categoryId: '' }
+  const emptyForm = { name: '', sku: '', unit: 'pcs', costPrice: '', sellPrice: '', stock: '', minStock: '', categoryId: '', imageUrl: null as string | null }
   const [form, setForm] = useState(emptyForm)
   const [formError, setFormError] = useState('')
 
@@ -73,6 +75,7 @@ export function ProdukClient({ initialProducts, categories, unitId, userRole }: 
       stock: p.stock.toString(),
       minStock: p.minStock.toString(),
       categoryId: p.category?.id ?? '',
+      imageUrl: p.imageUrl,
     })
     setFormError('')
     setShowForm(true)
@@ -92,6 +95,7 @@ export function ProdukClient({ initialProducts, categories, unitId, userRole }: 
       stock: parseFloat(form.stock || '0'),
       minStock: parseFloat(form.minStock || '0'),
       categoryId: form.categoryId || null,
+      imageUrl: form.imageUrl,
     }
 
     try {
@@ -116,6 +120,7 @@ export function ProdukClient({ initialProducts, categories, unitId, userRole }: 
         sellPrice: Number(saved.sellPrice),
         stock: Number(saved.stock),
         minStock: Number(saved.minStock),
+        imageUrl: saved.imageUrl ?? null,
         category: saved.category ?? null,
       }
 
@@ -196,6 +201,7 @@ export function ProdukClient({ initialProducts, categories, unitId, userRole }: 
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left text-xs text-gray-500 uppercase tracking-wide">
+                <th className="px-5 py-3 font-semibold w-14"></th>
                 <th className="px-5 py-3 font-semibold">Produk</th>
                 <th className="px-5 py-3 font-semibold">Kategori</th>
                 <th className="px-5 py-3 font-semibold text-right">Harga Modal</th>
@@ -208,7 +214,7 @@ export function ProdukClient({ initialProducts, categories, unitId, userRole }: 
             <tbody className="divide-y divide-gray-50">
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-10 text-center text-sm text-gray-400">
+                  <td colSpan={8} className="px-5 py-10 text-center text-sm text-gray-400">
                     Tidak ada produk ditemukan
                   </td>
                 </tr>
@@ -217,6 +223,18 @@ export function ProdukClient({ initialProducts, categories, unitId, userRole }: 
                 const isLow = p.stock <= p.minStock
                 return (
                   <tr key={p.id} className={`hover:bg-gray-50 ${isLow ? 'bg-red-50/40' : ''}`}>
+                    <td className="px-5 py-3.5">
+                      <div className="w-10 h-10 rounded-lg border border-gray-100 bg-gray-50 overflow-hidden flex items-center justify-center">
+                        {p.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={p.imageUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <svg className="w-5 h-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M14 8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-5 py-3.5">
                       <p className="font-medium text-gray-900">{p.name}</p>
                       {p.sku && <p className="text-xs text-gray-400">{p.sku}</p>}
@@ -285,6 +303,12 @@ export function ProdukClient({ initialProducts, categories, unitId, userRole }: 
                   {formError}
                 </div>
               )}
+
+              <ImageUpload
+                value={form.imageUrl}
+                onChange={(url) => setForm({ ...form, imageUrl: url })}
+                folder="produk"
+              />
 
               <Field label="Nama Produk *">
                 <input
