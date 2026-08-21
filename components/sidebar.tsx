@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import type { Role, UnitType } from '@prisma/client'
+import { BRAND_NAME } from '@/lib/brand'
 
 type NavItem = {
   label: string
@@ -181,7 +182,7 @@ export function Sidebar({ user, siteName, units, isMobileOpen = false, onClose }
         {/* Brand */}
         <div className="px-6 py-5 border-b border-gray-700 flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">Bisnis Terpadu</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-0.5">{BRAND_NAME}</p>
             <p className="text-white font-bold text-lg leading-tight truncate">{siteName}</p>
           </div>
           {/* Tombol tutup — hanya mobile */}

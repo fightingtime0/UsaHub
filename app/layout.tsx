@@ -9,7 +9,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const siteName = await getSiteName()
   return {
     title: siteName,
-    description: 'Sistem Manajemen Bisnis Terpadu',
+    description: 'Sistem Manajemen Bisnis Terpadu — Usahub.my.id',
   }
 }
 

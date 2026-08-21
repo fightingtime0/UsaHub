@@ -49,8 +49,8 @@ function SiteNameCard({ initialSiteName }: { initialSiteName: string }) {
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 md:p-5">
-      <h2 className="font-semibold text-gray-900 text-sm md:text-base mb-1">Nama Aplikasi</h2>
-      <p className="text-xs text-gray-500 mb-4">Judul tab browser dan nama yang tampil di sidebar. Saat ini: <span className="font-medium text-gray-700">{siteName}</span></p>
+      <h2 className="font-semibold text-gray-900 text-sm md:text-base mb-1">Nama Bisnis</h2>
+      <p className="text-xs text-gray-500 mb-4">Judul tab browser dan nama yang tampil di sidebar — khusus bisnis Anda, tidak memengaruhi tenant lain. Saat ini: <span className="font-medium text-gray-700">{siteName}</span></p>
       <form onSubmit={handleSave} className="flex gap-2 max-w-md">
         <input
           value={input} onChange={(e) => setInput(e.target.value)}
