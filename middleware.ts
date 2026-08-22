@@ -27,6 +27,7 @@ export default withAuth(
       RESTAURANT: ['/restoran'],
       LODGING:    ['/penginapan'],
       PERTASHOP:  ['/pertashop'],
+      KOPI_TELO:  ['/kopitelo'],
     }
 
     const unitType = token?.primaryUnitType as string | null
@@ -56,5 +57,5 @@ export default withAuth(
 )
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/toko/:path*', '/homestay/:path*', '/restoran/:path*', '/penginapan/:path*', '/pertashop/:path*', '/b2b/:path*', '/sdm/:path*', '/laporan/:path*', '/superadmin/:path*'],
+  matcher: ['/dashboard/:path*', '/toko/:path*', '/homestay/:path*', '/restoran/:path*', '/penginapan/:path*', '/pertashop/:path*', '/kopitelo/:path*', '/b2b/:path*', '/sdm/:path*', '/laporan/:path*', '/superadmin/:path*'],
 }

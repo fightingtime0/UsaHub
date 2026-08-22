@@ -9,6 +9,7 @@ const UNIT_META: Record<UnitType, { fallbackLabel: string; color: string; href: 
   RESTAURANT: { fallbackLabel: 'Restoran',    color: 'bg-orange-500',  href: '/restoran' },
   LODGING:    { fallbackLabel: 'Penginapan',  color: 'bg-purple-500',  href: '/penginapan' },
   PERTASHOP:  { fallbackLabel: 'Pertashop',   color: 'bg-emerald-500', href: '/pertashop' },
+  KOPI_TELO:  { fallbackLabel: 'Kopi Telo',   color: 'bg-amber-500',   href: '/kopitelo' },
 }
 
 export default async function DashboardPage() {
@@ -23,6 +24,7 @@ export default async function DashboardPage() {
       RESTAURANT: '/restoran',
       LODGING:    '/penginapan',
       PERTASHOP:  '/pertashop',
+      KOPI_TELO:  '/kopitelo',
     }
     const dest = session.user.primaryUnitType
       ? unitRedirect[session.user.primaryUnitType]

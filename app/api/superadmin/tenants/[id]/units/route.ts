@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import type { UnitType } from '@prisma/client'
 
-const VALID_TYPES: UnitType[] = ['RETAIL', 'HOMESTAY', 'RESTAURANT', 'LODGING', 'PERTASHOP']
+const VALID_TYPES: UnitType[] = ['RETAIL', 'HOMESTAY', 'RESTAURANT', 'LODGING', 'PERTASHOP', 'KOPI_TELO']
 
 // POST — aktifkan (buat) unit bisnis jenis tertentu untuk tenant ini (SUPERADMIN only).
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

@@ -11,6 +11,7 @@ const UNIT_TYPE_LABEL: Record<string, string> = {
   RESTAURANT: 'Restoran',
   LODGING: 'Penginapan',
   PERTASHOP: 'Pertashop',
+  KOPI_TELO: 'Kopi Telo',
 }
 
 function SiteNameCard({ initialSiteName }: { initialSiteName: string }) {

@@ -23,6 +23,7 @@ enum UnitType {
   RESTAURANT
   LODGING
   PERTASHOP
+  KOPI_TELO // restoran skala besar / rest area, khusus melayani rombongan travel
 }
 
 enum Role {
@@ -861,6 +862,9 @@ model GroupOrder {
   orderCode     String           @unique
   customerName  String
   customerPhone String?
+  travelName    String? // nama biro travel (Kopi Telo / rest area)
+  busPo         String? // PO bus yang mengangkut rombongan
+  source        String   @default("ADMIN") // "ADMIN" = diinput operator, "WEB" = dari link reservasi publik
   eventDate     DateTime // tanggal & jam acara
   pax           Int // jumlah orang
   menuType      String // "Paket A", "Prasmanan", dll

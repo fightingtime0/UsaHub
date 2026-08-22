@@ -8,13 +8,14 @@ import type { UnitType, Role } from '@prisma/client'
 type BusinessUnitLite = { id: string; name: string; type: UnitType; isActive: boolean }
 type UserLite = { id: string; name: string; email: string; role: Role; isActive: boolean }
 
-const ALL_TYPES: UnitType[] = ['RETAIL', 'HOMESTAY', 'RESTAURANT', 'LODGING', 'PERTASHOP']
+const ALL_TYPES: UnitType[] = ['RETAIL', 'HOMESTAY', 'RESTAURANT', 'LODGING', 'PERTASHOP', 'KOPI_TELO']
 const TYPE_LABEL: Record<UnitType, string> = {
   RETAIL: 'Toko',
   HOMESTAY: 'Homestay',
   RESTAURANT: 'Restoran',
   LODGING: 'Penginapan',
   PERTASHOP: 'Pertashop',
+  KOPI_TELO: 'Kopi Telo',
 }
 const ROLE_LABEL: Record<Role, string> = {
   SUPERADMIN: 'Superadmin',

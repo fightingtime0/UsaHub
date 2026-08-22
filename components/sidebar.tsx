@@ -63,6 +63,13 @@ const NAV_ITEMS: NavItem[] = [
     unitTypes: ['PERTASHOP'],
   },
   {
+    label: 'Kopi Telo',
+    href: '/kopitelo',
+    icon: <Icon d="M3 8h13v5a5 5 0 01-5 5H8a5 5 0 01-5-5V8zm13 1h2.5a2.5 2.5 0 010 5H16M4 21h14M7 5V3m4 2V3" />,
+    roles: ['OWNER', 'MANAGER', 'STAFF', 'CASHIER'],
+    unitTypes: ['KOPI_TELO'],
+  },
+  {
     label: 'B2B Invoice',
     href: '/b2b',
     icon: <Icon d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />,
